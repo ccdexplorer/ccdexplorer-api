@@ -57,16 +57,16 @@ tags_metadata = [
         "name": "Transaction",
         "description": "Routes to retrieve information from a transaction.",
     },
-    {
-        "name": "Token",
-        "description": "Routes to retrieve information from a token.",
-    },
+    # {
+    #     "name": "Token",
+    #     "description": "Routes to retrieve information from a token.",
+    # },
     {
         "name": "Account",
         "description": "Routes to retrieve information from an account.",
         "externalDocs": {
             "description": "GRPC Models",
-            "url": "https://docs.ccdexplorer.io",
+            "url": "https://github.com/ccdexplorer/ccdexplorer-fundamentals/blob/main/docs/grpc_types_docs.md",
         },
     },
 ]
@@ -79,8 +79,7 @@ app = FastAPI(
     summary="The API service for CCDExplorer.io.",
     version="0.0.1",
     contact={
-        "name": "explorer.ccd",
-        "url": "https://telegram.me/sderuiter",
+        "name": "explorer.ccd on Telegram",
     },
     license_info={
         "name": "Apache 2.0",
@@ -91,4 +90,4 @@ instrumentator = Instrumentator().instrument(app)
 
 app.include_router(account_v1.router)
 app.include_router(transaction_v1.router)
-app.include_router(token_v1.router)
+# app.include_router(token_v1.router)
