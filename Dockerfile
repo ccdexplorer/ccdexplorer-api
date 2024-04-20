@@ -2,7 +2,7 @@ FROM tiangolo/uvicorn-gunicorn-fastapi:python3.11-slim
 # ADD --chmod=755 https://astral.sh/uv/install.sh /install.sh
 # RUN /install.sh && rm /install.sh
 ADD https://astral.sh/uv/install.sh /install.sh
-RUN chmod -R 655 /install.sh && /install.sh && rm /install.sh
+RUN chmod -R 655 /install.sh && /install.sh 
 WORKDIR /code
 COPY ./requirements.txt /code/requirements.txt
 # RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
