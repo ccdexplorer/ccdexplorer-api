@@ -5,6 +5,7 @@ from ccdexplorer_fundamentals.mongodb import (
     Collections,
 )
 from pydantic import BaseModel
+from pymongo import ReplaceOne
 from app.state.state import get_mongo_db
 
 
@@ -52,8 +53,6 @@ async def add_token_address_to_metadata_refresh_queue(
 ) -> JSONResponse:
     """
     Endpoint to queue a token for a refresh of the metadata from the token metadataUrl.
-
-
     """
     token_id = "" if token_id == "_" else token_id
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
@@ -63,7 +62,29 @@ async def add_token_address_to_metadata_refresh_queue(
     )
 
     if token_from_collection:
+        result = db_to_use[Collections.helpers].find_one(
+            {"_id": "refetch_token_metadata_url"}
+        )
+        current_token_addresses: list = result["token_addresses"]
+        current_token_addresses.append(
+            {
+                "contract_index": contract_index,
+                "contract_subindex": contract_subindex,
+                "token_id": token_id,
+            }
+        )
 
+        queue_item = [
+            ReplaceOne(
+                {"_id": "refetch_token_metadata_url"},
+                replacement={
+                    "_id": "refetch_token_metadata_url",
+                    "token_addresses": current_token_addresses,
+                },
+                upsert=True,
+            )
+        ]
+        _ = db_to_use[Collections.helpers].bulk_write(queue_item)
         return JSONResponse({"detail": "Ok"})
     else:
         raise HTTPException(

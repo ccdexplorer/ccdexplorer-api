@@ -90,4 +90,4 @@ instrumentator = Instrumentator().instrument(app)
 
 app.include_router(account_v1.router)
 app.include_router(transaction_v1.router)
-# app.include_router(token_v1.router)
+app.include_router(token_v1.router)
