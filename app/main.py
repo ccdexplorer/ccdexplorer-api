@@ -37,7 +37,7 @@ from ccdexplorer_fundamentals.tooter import Tooter
 grpcclient = GRPCClient()
 tooter = Tooter()
 
-mongodb = MongoDB(tooter)
+mongodb = MongoDB(tooter, nearest=True)
 motormongo = MongoMotor(tooter)
 
 
