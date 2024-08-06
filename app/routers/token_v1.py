@@ -19,7 +19,7 @@ class TokenHolding(BaseModel):
 router = APIRouter(tags=["Token"], prefix="/v1")
 
 
-@router.post(
+@router.get(
     "/{net}/token/{contract_index}/{contract_subindex}/{token_id}/info",
     response_class=JSONResponse,
 )
