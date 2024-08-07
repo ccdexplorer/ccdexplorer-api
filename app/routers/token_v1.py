@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse, RedirectResponse
+from ccdexplorer_fundamentals.GRPCClient import GRPCClient
+from ccdexplorer_fundamentals.cis import CIS
+from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_ContractAddress
+from ccdexplorer_fundamentals.enums import NET
 from ccdexplorer_fundamentals.mongodb import (
     MongoDB,
     Collections,
 )
 from pydantic import BaseModel
 from pymongo import ReplaceOne
-from app.state.state import get_mongo_db
+from app.state.state import get_mongo_db, get_grpcclient
 
 
 class TokenHolding(BaseModel):
@@ -17,6 +21,35 @@ class TokenHolding(BaseModel):
 
 
 router = APIRouter(tags=["Token"], prefix="/v1")
+
+
+def get_owner_history_for_provenance(
+    grpcclient: GRPCClient,
+    tokenID: str,
+    contract_address: CCD_ContractAddress,
+    net: NET,
+):
+    entrypoint = "provenance_tag_nft.view_owner_history"
+    ci = CIS(
+        grpcclient,
+        contract_address.index,
+        contract_address.subindex,
+        entrypoint,
+        net,
+    )
+    parameter_bytes = ci.viewOwnerHistoryRequest(tokenID)
+
+    ii = grpcclient.invoke_instance(
+        "last_final",
+        contract_address.index,
+        contract_address.subindex,
+        entrypoint,
+        parameter_bytes,
+        net,
+    )
+
+    result = ii.success.return_value
+    return ci.viewOwnerHistoryResponse(result)
 
 
 @router.get(
@@ -30,9 +63,11 @@ async def get_info_for_token_address(
     contract_subindex: int,
     token_id: str | None,
     mongodb: MongoDB = Depends(get_mongo_db),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
 ) -> JSONResponse:
     """
-    Endpoint to get information for a given token address..
+    Endpoint to get information for a given token address. For Provenance Tags specifically, the `owner_history`
+    property is added if available.
     """
     # token_id = "" if token_id == "_" else token_id
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
@@ -51,14 +86,41 @@ async def get_info_for_token_address(
         )
 
         # get current owner from the token_links collection
-        current_owner_link = db_to_use[Collections.tokens_links_v2].find_one(
-            {"token_holding.token_address": token_address}
+        current_owner_link = list(
+            db_to_use[Collections.tokens_links_v2].find(
+                {"token_holding.token_address": token_address}
+            )
         )
-        token_from_collection.update(
-            {"current_owner": current_owner_link["account_address"]}
+        current_owners = []
+        for link in current_owner_link:
+            current_owners.append(
+                {
+                    "address": link["account_address"],
+                    "balance": int(link["token_holding"]["token_amount"]),
+                }
+            )
+
+        token_from_collection.update({"current_owners": current_owners})
+
+        # Provenance Tags Owner History
+        provenance_tag_stored = db_to_use[Collections.tokens_tags].find_one(
+            {"_id": "provenance-tags"}
         )
+        if provenance_tag_stored:
+            owner_history_list = get_owner_history_for_provenance(
+                grpcclient,
+                token_id,
+                CCD_ContractAddress.from_index(contract_index, contract_subindex),
+                NET(net),
+            )
+            if owner_history_list:
+                token_from_collection.update({"owner_history": owner_history_list})
+
         if "hidden" in token_from_collection:
             del token_from_collection["hidden"]
+        if "token_holders" in token_from_collection:
+            del token_from_collection["token_holders"]
+
         return JSONResponse(token_from_collection)
     else:
         raise HTTPException(
