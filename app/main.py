@@ -28,9 +28,11 @@ from ccdexplorer_fundamentals.GRPCClient import GRPCClient
 from app.console import console
 from app.ENV import *
 from app.routers import transaction_v1
+from app.routers import transactions_v1
 from app.routers import account_v1
 from app.routers import token_v1
 from app.routers import block_v1
+from app.routers import blocks_v1
 
 from ccdexplorer_fundamentals.tooter import Tooter
 
@@ -91,5 +93,7 @@ instrumentator = Instrumentator().instrument(app)
 
 app.include_router(account_v1.router)
 app.include_router(transaction_v1.router)
+app.include_router(transactions_v1.router)
 app.include_router(token_v1.router)
 app.include_router(block_v1.router)
+app.include_router(blocks_v1.router)
