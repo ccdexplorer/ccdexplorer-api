@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from ccdexplorer_fundamentals.tooter import Tooter, TooterType, TooterChannel  # noqa
 from ccdexplorer_fundamentals.mongodb import (
-    MongoDB,
+    MongoMotor,
     Collections,
 )
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_BlockItemSummary
@@ -17,7 +17,7 @@ async def get_last_transactions(
     request: Request,
     net: str,
     count: int,
-    mongomotor: MongoDB = Depends(get_mongo_motor),
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
 ) -> list[dict]:
     """
     Endpoint to get the last X transactions as stored in MongoDB collection `transactions`. Maxes out at 50.
@@ -46,4 +46,65 @@ async def get_last_transactions(
         raise HTTPException(
             status_code=404,
             detail=f"Error retrieving last {count} transactions on {net}, {error}.",
+        )
+
+
+@router.get("/{net}/transactions/info/tps", response_class=JSONResponse)
+async def get_transactions_tps(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+) -> dict:
+    """
+    Endpoint to get the transactions TPS as stored in MongoDB collection `pre_render`.
+
+    """
+    if net != "mainnet":
+        raise HTTPException(
+            status_code=404,
+            detail="Transactions TPS information only available for mainnet.",
+        )
+
+    db_to_use = mongomotor.mainnet
+    try:
+        result = await db_to_use[Collections.pre_render].find_one({"_id": "tps_table"})
+        error = None
+    except Exception as error:
+        print(error)
+        result = None
+
+    if result:
+        return result
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Error retrieving last transactions tps, {error}.",
+        )
+
+
+@router.get("/{net}/transactions/info/count", response_class=JSONResponse)
+async def get_transactions_count_estimate(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+) -> int:
+    """
+    Endpoint to get the transactions estimated count.
+
+    """
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    try:
+        result = await db_to_use[Collections.transactions].estimated_document_count()
+        error = None
+    except Exception as error:
+        print(error)
+        result = None
+
+    if result:
+        return result
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Error retrieving transactions count on {net}, {error}.",
         )
