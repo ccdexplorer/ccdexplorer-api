@@ -14,7 +14,7 @@ from app.state.state import get_mongo_db
 router = APIRouter(tags=["Transaction"], prefix="/v1")
 
 
-@router.get("/{net}/transaction/{tx_hash}/logged_events", response_class=JSONResponse)
+@router.get("/{net}/transaction/{tx_hash}/logged-events", response_class=JSONResponse)
 async def get_transaction_logged_events(
     request: Request,
     net: str,

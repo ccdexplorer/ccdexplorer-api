@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi_restful.tasks import repeat_every
 from rich import print
 from ccdexplorer_fundamentals.mongodb import MongoDB, MongoMotor
+from ccdexplorer_fundamentals.enums import NET
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # from app.__chain import *
