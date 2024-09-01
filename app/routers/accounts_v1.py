@@ -1,0 +1,40 @@
+from ccdexplorer_fundamentals.mongodb import (
+    Collections,
+    MongoMotor,
+)
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
+
+from app.state.state import get_mongo_motor
+
+router = APIRouter(tags=["Accounts"], prefix="/v1")
+
+
+@router.get("/{net}/accounts/info/count", response_class=JSONResponse)
+async def get_accounts_count_estimate(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+) -> int:
+    """
+    Endpoint to get the accounts estimated count.
+
+    """
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    try:
+        result = await db_to_use[
+            Collections.all_account_addresses
+        ].estimated_document_count()
+        error = None
+    except Exception as error:
+        print(error)
+        result = None
+
+    if result:
+        return result
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Error retrieving accounts count on {net}, {error}.",
+        )

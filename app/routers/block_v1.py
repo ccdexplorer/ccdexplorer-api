@@ -109,7 +109,7 @@ async def get_block_chain_parameters(
     grpcclient: GRPCClient = Depends(get_grpcclient),
 ) -> CCD_ChainParameters:
     """
-    Endpoint to get special events for the given block.
+    Endpoint to get chain parameters for the given block.
     """
     chain_parameters = grpcclient.get_block_chain_parameters(height, net=NET(net))
 
