@@ -37,6 +37,9 @@ from app.routers import tokens_v1
 from app.routers import block_v1
 from app.routers import blocks_v1
 from app.routers import markets_v1
+from app.routers import contract_v1
+from app.routers import misc_v1
+from app.routers import user_v1
 
 from ccdexplorer_fundamentals.tooter import Tooter
 
@@ -104,3 +107,6 @@ app.include_router(tokens_v1.router)
 app.include_router(block_v1.router)
 app.include_router(blocks_v1.router)
 app.include_router(markets_v1.router)
+app.include_router(contract_v1.router)
+app.include_router(misc_v1.router)
+app.include_router(user_v1.router)

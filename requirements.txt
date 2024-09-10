@@ -5,7 +5,7 @@ sentry-sdk[fastapi]
 pymongo
 typing_inspect
 ccdexplorer-fundamentals
-
+ccdexplorer_schema_parser
 grpcio
 grpcio-tools
 grpclib
