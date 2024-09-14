@@ -1,17 +1,15 @@
+from datetime import timedelta
+
+import dateutil
 from ccdexplorer_fundamentals.enums import NET
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
-from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_ContractAddress
-from ccdexplorer_fundamentals.GRPCClient.types_pb2 import VersionedModuleSource
 from ccdexplorer_fundamentals.mongodb import (
     Collections,
     CollectionsUtilities,
     MongoMotor,
 )
-from ccdexplorer_schema_parser.Schema import Schema
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
-import json
-import base64
 
 from app.state.state import get_grpcclient, get_mongo_motor
 
@@ -67,6 +65,37 @@ async def get_credential_issuers(
         raise HTTPException(
             status_code=404,
             detail=f"Error getting credential issuers on {net}.",
+        )
+
+
+@router.get(
+    "/{net}/misc/identity-providers",
+    response_class=JSONResponse,
+)
+async def get_identity_providers(
+    request: Request,
+    net: str,
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+) -> JSONResponse:
+    """
+    Endpoint to get identity providers for the requested net.
+    """
+
+    identity_providers = {}
+    tmp = grpcclient.get_identity_providers("last_final", NET(net))
+
+    for id in tmp:
+        identity_providers[id.identity] = {
+            "ip_identity": id.identity,
+            "ip_description": id.description.name,
+        }
+
+    if len(identity_providers.keys()) > 0:
+        return JSONResponse(identity_providers)
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Error getting identity providers on {net}.",
         )
 
 
@@ -149,3 +178,71 @@ async def get_labeled_accounts(
     }
 
     return JSONResponse(tags)
+
+
+def generate_dates_from_start_until_end(start: str, end: str):
+    start_date = dateutil.parser.parse(start)
+    end_date = dateutil.parser.parse(end)
+    date_range = []
+
+    current_date = start_date
+    while current_date <= end_date:
+        date_range.append(current_date.strftime("%Y-%m-%d"))
+        current_date += timedelta(days=1)
+
+    return date_range
+
+
+@router.get(
+    "/{net}/misc/tx-data/{project_id}/{start_date}/{end_date}",
+    response_class=JSONResponse,
+)
+async def get_tx_data_for_project(
+    request: Request,
+    net: str,
+    project_id: str,
+    start_date: str,
+    end_date: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+) -> JSONResponse:
+    """
+    Endpoint to get transactions counts for projects (and the chain).
+    """
+
+    dates_to_include = generate_dates_from_start_until_end(start_date, end_date)
+    pipeline = [
+        {"$match": {"date": {"$in": dates_to_include}}},
+        {"$match": {"type": "statistics_transaction_types"}},
+        {"$match": {"project": project_id}},
+        {"$project": {"_id": 0, "type": 0, "usecase": 0}},
+        {"$sort": {"date": 1}},
+    ]
+    result = (
+        await mongomotor.mainnet[Collections.statistics]
+        .aggregate(pipeline)
+        .to_list(length=None)
+    )
+    return JSONResponse([x for x in result])
+
+
+@router.get(
+    "/{net}/misc/validator-nodes/count",
+    response_class=JSONResponse,
+)
+async def get_nodes_count(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+) -> JSONResponse:
+    """
+    Endpoint to get count of all validator nodes.
+    """
+    db_to_use = mongomotor.mainnet
+    result = await db_to_use[Collections.paydays_current_payday].count_documents({})
+    if result:
+        return result
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail="Error requesting nodes for {net}.",
+        )

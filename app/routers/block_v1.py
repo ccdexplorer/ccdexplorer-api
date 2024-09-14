@@ -7,7 +7,12 @@ from ccdexplorer_fundamentals.GRPCClient.CCD_Types import (
     CCD_ChainParameters,
     CCD_BlockItemSummary,
 )
-from ccdexplorer_fundamentals.mongodb import MongoMotor, Collections, Collection
+from ccdexplorer_fundamentals.mongodb import (
+    MongoMotor,
+    Collections,
+    MongoTypePoolReward,
+    MongoTypeAccountReward,
+)
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
@@ -77,6 +82,197 @@ async def get_block_txs(
         raise HTTPException(
             status_code=404,
             detail=f"Can't retrieve transactions for block at {height} on {net}",
+        )
+
+
+@router.get(
+    "/{net}/block/{height_or_hash}/payday",
+    response_class=JSONResponse,
+)
+async def get_block_payday_true_false(
+    request: Request,
+    net: str,
+    height_or_hash: int | str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+) -> dict:
+    """
+    Endpoint to get determine if a block is a payday block.
+    """
+    try:
+        # if this doesn't fail, it's type int.
+        height_or_hash = int(height_or_hash)
+    except ValueError:
+        pass
+    db_to_use = mongomotor.mainnet
+    try:
+        if isinstance(height_or_hash, int):
+            payday_result = await db_to_use[Collections.paydays].find_one(
+                {"height_for_last_block": height_or_hash - 1}
+            )
+        else:
+            payday_result = await db_to_use[Collections.paydays].find_one(
+                {"_id": height_or_hash}
+            )
+        # if True, this block has payday rewards
+        if payday_result:
+            result_pool_rewards = (
+                await db_to_use[Collections.paydays_rewards]
+                .aggregate(
+                    [
+                        {"$match": {"date": payday_result["date"]}},
+                        {"$match": {"pool_owner": {"$exists": True}}},
+                        {"$count": "count_of_pool_rewards"},
+                    ]
+                )
+                .to_list(length=None)
+            )
+            result_account_rewards = (
+                await db_to_use[Collections.paydays_rewards]
+                .aggregate(
+                    [
+                        {"$match": {"date": payday_result["date"]}},
+                        {"$match": {"account_id": {"$exists": True}}},
+                        {"$count": "count_of_account_rewards"},
+                    ]
+                )
+                .to_list(length=None)
+            )
+            return {
+                "is_payday": True,
+                "count_of_account_rewards": result_account_rewards[0][
+                    "count_of_account_rewards"
+                ],
+                "count_of_pool_rewards": result_pool_rewards[0][
+                    "count_of_pool_rewards"
+                ],
+            }
+        else:
+            return {"is_payday": False}
+    except Exception as error:
+        print(error)
+        raise HTTPException(
+            status_code=404,
+            detail=f"Can't determine whether block at {height_or_hash} on {net} is a payday.",
+        )
+
+
+@router.get(
+    "/{net}/block/{height}/payday/pool-rewards/{skip}/{limit}",
+    response_class=JSONResponse,
+)
+async def get_block_payday_pool_rewards(
+    request: Request,
+    net: str,
+    height: int,
+    skip: int,
+    limit: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+) -> list[MongoTypePoolReward]:
+    """
+    Endpoint to get pool rewards for the given block from mongodb.
+    """
+
+    db_to_use = mongomotor.mainnet
+    try:
+        payday_result = await db_to_use[Collections.paydays].find_one(
+            {"height_for_last_block": height - 1}
+        )
+        # if True, this block has payday rewards
+        if payday_result:
+            result = (
+                await db_to_use[Collections.paydays_rewards]
+                .aggregate(
+                    [
+                        {"$match": {"date": payday_result["date"]}},
+                        {"$match": {"pool_owner": {"$exists": True}}},
+                        {
+                            "$facet": {
+                                "metadata": [{"$count": "total"}],
+                                "data": [
+                                    {"$skip": int(skip)},
+                                    {"$limit": int(limit)},
+                                ],
+                            }
+                        },
+                    ]
+                )
+                .to_list(length=None)
+            )
+
+        reward_result = [MongoTypePoolReward(**x) for x in result[0]["data"]]
+
+        error = None
+    except Exception as error:
+        print(error)
+        reward_result = None
+
+    if reward_result is not None:
+
+        return reward_result
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Can't retrieve pool rewards for block at {height} on {net}",
+        )
+
+
+@router.get(
+    "/{net}/block/{height}/payday/account-rewards/{skip}/{limit}",
+    response_class=JSONResponse,
+)
+async def get_block_payday_account_rewards(
+    request: Request,
+    net: str,
+    height: int,
+    skip: int,
+    limit: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+) -> list[MongoTypeAccountReward]:
+    """
+    Endpoint to get account rewards for the given block from mongodb.
+    """
+
+    db_to_use = mongomotor.mainnet
+    try:
+        payday_result = await db_to_use[Collections.paydays].find_one(
+            {"height_for_last_block": height - 1}
+        )
+        # if True, this block has payday rewards
+        if payday_result:
+            result = (
+                await db_to_use[Collections.paydays_rewards]
+                .aggregate(
+                    [
+                        {"$match": {"date": payday_result["date"]}},
+                        {"$match": {"account_id": {"$exists": True}}},
+                        {
+                            "$facet": {
+                                "metadata": [{"$count": "total"}],
+                                "data": [
+                                    {"$skip": int(skip)},
+                                    {"$limit": int(limit)},
+                                ],
+                            }
+                        },
+                    ]
+                )
+                .to_list(length=None)
+            )
+
+        reward_result = [MongoTypeAccountReward(**x) for x in result[0]["data"]]
+
+        error = None
+    except Exception as error:
+        print(error)
+        reward_result = None
+
+    if reward_result is not None:
+
+        return reward_result
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Can't retrieve account rewards for block at {height} on {net}",
         )
 
 

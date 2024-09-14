@@ -68,3 +68,40 @@ async def get_schema_from_source(
             status_code=404,
             detail=f"Requested smart contract '<{contract_index},{contract_subindex}>' is not found on {net}.",
         )
+
+
+@router.get(
+    "/{net}/contract/{contract_index}/{contract_subindex}/token-information",
+    response_class=JSONResponse,
+)
+async def get_token_information(
+    request: Request,
+    net: str,
+    contract_index: int,
+    contract_subindex: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+) -> JSONResponse:
+    """
+    Endpoint to get the token information a smart contract.
+    """
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+
+    result = (
+        await db_to_use[Collections.tokens_tags]
+        .find(
+            {
+                "contracts": CCD_ContractAddress.from_index(
+                    contract_index, contract_subindex
+                ).to_str()
+            }
+        )
+        .to_list(length=1)
+    )
+    if result:
+        return result[0]
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested smart contract '<{contract_index},{contract_subindex}>' token information not found on {net}.",
+        )
