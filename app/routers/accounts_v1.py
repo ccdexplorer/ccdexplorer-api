@@ -23,16 +23,20 @@ async def get_accounts_count_estimate(
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     try:
-        result = await db_to_use[
-            Collections.all_account_addresses
-        ].estimated_document_count()
+        result = (
+            await db_to_use[Collections.all_account_addresses]
+            .find({})
+            .sort({"account_index": -1})
+            .limit(1)
+            .to_list(length=1)
+        )
         error = None
     except Exception as error:
         print(error)
         result = None
 
     if result:
-        return result
+        return int(result[0]["account_index"]) + 1
     else:
         raise HTTPException(
             status_code=404,
