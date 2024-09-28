@@ -1,0 +1,48 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+<h2>API Key Management</h2>
+<br/>
+<div class="row">
+    <div class="col-md-8">
+<p>Your current API keys:</p>
+<table class="table table-borderless">
+    <thead>
+      <tr class="sm-text">
+        <th class="text-secondary-emphasis text-start" scope="col">Key</th>
+        <th class="text-secondary-emphasis text-end" scope="col">Tier</th>
+  
+      </tr>
+    </thead>
+    <tbody>
+        {% for key in user_api_keys %}
+        <tr class="sm-text">
+            
+            <td class="text-secondary-emphasis text-start"><code>{{key.key}}</code></td>
+            <td class="text-secondary-emphasis text-end">{{key.tier}}</td>
+        </tr>
+        {% endfor %}  
+      
+  
+    </tbody>
+  </table>
+</div>
+</div>
+
+<h4>Add key</h4>
+Note: a new key in the <i>Free</i> tier is active at once. For the paid tiers (<i>Standard</i> and <i>Pro</i>) it will take up to 1 day after receipt of the first payment to become active. 
+<form action="/management/new-key" method="POST">
+    <div class="form-group mt-3 mb-3">
+        <label for="tier">Select Tier</label>
+        <select class="form-control " name="tier" id="tier">
+          <option value="free">Free</option>
+          <option value="standard">Standard</option>
+          <option value="pro">Pro</option>
+          
+        </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary" >Request Key</button>
+    
+  </form>
+{% endblock content %}

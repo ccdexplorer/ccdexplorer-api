@@ -1,17 +1,17 @@
-from fastapi import APIRouter, Request, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends, HTTPException, Security
+from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
 from pymongo import ASCENDING
-from ccdexplorer_fundamentals.tooter import Tooter, TooterType, TooterChannel  # noqa
 from ccdexplorer_fundamentals.mongodb import (
     MongoDB,
     Collections,
 )
 from ccdexplorer_fundamentals.cis import MongoTypeLoggedEvent
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_BlockItemSummary
-from app.state.state import get_mongo_db
+from app.state import get_mongo_db
 
 
-router = APIRouter(tags=["Transaction"], prefix="/v1")
+router = APIRouter(tags=["Transaction"], prefix="/v2")
 
 
 @router.get("/{net}/transaction/{tx_hash}/logged-events", response_class=JSONResponse)
@@ -20,6 +20,7 @@ async def get_transaction_logged_events(
     net: str,
     tx_hash: str,
     mongodb: MongoDB = Depends(get_mongo_db),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> list[MongoTypeLoggedEvent]:
     """
     Endpoint to get logged events for a transaction as stored in MongoDB collection `tokens_logged_events`. Note that only
@@ -56,6 +57,7 @@ async def get_transaction(
     net: str,
     tx_hash: str,
     mongodb: MongoDB = Depends(get_mongo_db),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_BlockItemSummary:
     """
     Endpoint to get a transaction as stored in MongoDB collection `transactions`.

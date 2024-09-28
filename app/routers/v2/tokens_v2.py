@@ -1,15 +1,14 @@
-from fastapi import APIRouter, Request, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends, HTTPException, Security
+from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
-from ccdexplorer_fundamentals.tooter import Tooter, TooterType, TooterChannel  # noqa
 from ccdexplorer_fundamentals.mongodb import (
     MongoDB,
     Collections,
 )
-from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_BlockItemSummary
-from app.state.state import get_mongo_motor
+from app.state import get_mongo_motor
 
 
-router = APIRouter(tags=["Tokens"], prefix="/v1")
+router = APIRouter(tags=["Tokens"], prefix="/v2")
 
 
 @router.get("/{net}/tokens/info/count", response_class=JSONResponse)
@@ -17,6 +16,7 @@ async def get_tokens_count_estimate(
     request: Request,
     net: str,
     mongomotor: MongoDB = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> int:
     """
     Endpoint to get the tokens estimated count.

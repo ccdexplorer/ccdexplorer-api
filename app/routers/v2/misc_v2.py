@@ -8,23 +8,25 @@ from ccdexplorer_fundamentals.mongodb import (
     CollectionsUtilities,
     MongoMotor,
 )
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Security
+from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
 
-from app.state.state import get_grpcclient, get_mongo_motor
+from app.state import get_grpcclient, get_mongo_motor
 
-router = APIRouter(tags=["Misc"], prefix="/v1")
+router = APIRouter(tags=["Misc"], prefix="/v2")
 
 
 @router.get(
     "/{net}/misc/cns-domain/{tokenID}",
     response_class=JSONResponse,
 )
-async def get_schema_from_source(
+async def get_bictory_cns_domain(
     request: Request,
     net: str,
     tokenID: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
     Endpoint to get possible Bictory CNS Domain name from tokenId.
@@ -49,6 +51,7 @@ async def get_credential_issuers(
     request: Request,
     net: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
     Endpoint to get credential issuers for the requested net.
@@ -76,6 +79,7 @@ async def get_identity_providers(
     request: Request,
     net: str,
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
     Endpoint to get identity providers for the requested net.
@@ -107,6 +111,7 @@ async def get_labeled_accounts(
     request: Request,
     net: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
     Endpoint to get community labeled accounts.
@@ -204,6 +209,7 @@ async def get_tx_data_for_project(
     start_date: str,
     end_date: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
     Endpoint to get transactions counts for projects (and the chain).
@@ -233,6 +239,7 @@ async def get_nodes_count(
     request: Request,
     net: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
     Endpoint to get count of all validator nodes.

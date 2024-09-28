@@ -13,12 +13,13 @@ from ccdexplorer_fundamentals.mongodb import (
     MongoTypePoolReward,
     MongoTypeAccountReward,
 )
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Security
+from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
 
-from app.state.state import get_grpcclient, get_mongo_motor
+from app.state import get_grpcclient, get_mongo_motor
 
-router = APIRouter(tags=["Block"], prefix="/v1")
+router = APIRouter(tags=["Block"], prefix="/v2")
 
 
 @router.get("/{net}/block/{height_or_hash}", response_class=JSONResponse)
@@ -27,6 +28,7 @@ async def get_block_at_height_from_grpc(
     net: str,
     height_or_hash: int | str,
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_BlockInfo:
     """
     Endpoint to get blockInfo from the node.
@@ -55,6 +57,7 @@ async def get_block_txs(
     skip: int,
     limit: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> list[CCD_BlockItemSummary]:
     """
     Endpoint to get transactions for the given block from mongodb.
@@ -94,6 +97,7 @@ async def get_block_payday_true_false(
     net: str,
     height_or_hash: int | str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """
     Endpoint to get determine if a block is a payday block.
@@ -167,6 +171,7 @@ async def get_block_payday_pool_rewards(
     skip: int,
     limit: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> list[MongoTypePoolReward]:
     """
     Endpoint to get pool rewards for the given block from mongodb.
@@ -227,6 +232,7 @@ async def get_block_payday_account_rewards(
     skip: int,
     limit: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> list[MongoTypeAccountReward]:
     """
     Endpoint to get account rewards for the given block from mongodb.
@@ -282,6 +288,7 @@ async def get_block_special_events(
     net: str,
     height: int,
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> list[CCD_BlockSpecialEvent]:
     """
     Endpoint to get special events for the given block.
@@ -303,6 +310,7 @@ async def get_block_chain_parameters(
     net: str,
     height: int,
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_ChainParameters:
     """
     Endpoint to get chain parameters for the given block.
@@ -323,6 +331,7 @@ async def get_last_finalized_block(
     request: Request,
     net: str,
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_FinalizedBlockInfo:
     """
     Endpoint to get the last block from the node.

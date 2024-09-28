@@ -6,15 +6,15 @@ from ccdexplorer_fundamentals.mongodb import (
     Collections,
     MongoMotor,
 )
-from ccdexplorer_schema_parser.Schema import Schema
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Security
+from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
 import json
 import base64
 
-from app.state.state import get_grpcclient, get_mongo_motor
+from app.state import get_grpcclient, get_mongo_motor
 
-router = APIRouter(tags=["Contract"], prefix="/v1")
+router = APIRouter(tags=["Contract"], prefix="/v2")
 
 
 @router.get(
@@ -28,6 +28,7 @@ async def get_schema_from_source(
     contract_subindex: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
     Endpoint to get the schema as extracted from the source of a smart contract.
@@ -80,6 +81,7 @@ async def get_token_information(
     contract_index: int,
     contract_subindex: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
     Endpoint to get the token information a smart contract.

@@ -13,12 +13,13 @@ from ccdexplorer_fundamentals.mongodb import (
     MongoTypePayday,
 )
 from ccdexplorer_fundamentals.tooter import Tooter, TooterChannel, TooterType  # noqa
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Security
+from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import datetime as dt
 from pymongo import DESCENDING, ASCENDING
-from app.state.state import get_grpcclient, get_mongo_db, get_mongo_motor
+from app.state import get_grpcclient, get_mongo_db, get_mongo_motor
 
 
 class TokenHolding(BaseModel):
@@ -28,7 +29,7 @@ class TokenHolding(BaseModel):
     token_amount: str
 
 
-router = APIRouter(tags=["Account"], prefix="/v1")
+router = APIRouter(tags=["Account"], prefix="/v2")
 
 
 @router.get("/{net}/account/{account_address}/tokens", response_class=JSONResponse)
@@ -37,6 +38,7 @@ async def get_account_tokens(
     net: str,
     account_address: str,
     mongodb: MongoDB = Depends(get_mongo_db),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> list[TokenHolding]:
     """
     Endpoint to get all tokens for a given account, as stored in MongoDB collection `tokens_links_v2`.
@@ -71,6 +73,7 @@ async def get_account_balance_at_block(
     account_address: str,
     block: int,
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> int:
     """
     Endpoint to get all CCD balance in microCCD for a given account at the given block.
@@ -97,6 +100,7 @@ async def get_account_balance(
     net: str,
     account_address: str,
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> int:
     """
     Endpoint to get all CCD balance in microCCD for a given account at the last final block.
@@ -125,6 +129,7 @@ async def get_account_info(
     net: str,
     index_or_hash: int | str,
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_AccountInfo:
     """
     Endpoint to get all account info for a given account at the last final block.
@@ -173,6 +178,7 @@ async def get_validator_earliest_win_time(
     net: str,
     index: int,
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> dt.datetime:
     """
     Endpoint to get earliest win time for an account that is an active validator.
@@ -211,6 +217,7 @@ async def get_validator_current_payday_stats(
     index: int,
     grpcclient: GRPCClient = Depends(get_grpcclient),
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> str:
     """
     Endpoint to get current payday stats for an account that is an active validator.
@@ -234,7 +241,7 @@ async def get_validator_current_payday_stats(
                 pool.current_payday_info.blocks_baked,
             )
         except grpc._channel._InactiveRpcError:
-            result = None
+            pass
 
         if stats:
             return stats
@@ -251,6 +258,7 @@ async def get_validator_pool_info(
     net: str,
     index: int,
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_PoolInfo:
     """
     Endpoint to get the current pool info for an account that is an active validator.
@@ -280,6 +288,7 @@ async def get_staking_rewards_bucketed(
     net: str,
     account_id: int | str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> list:
     """
     Endpoint to get staking rewards info for a given account for graphing.
@@ -310,6 +319,7 @@ async def get_validator_performance(
     net: str,
     index: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> list:
     """
     Endpoint to get validator performance for a given validator.
@@ -333,6 +343,34 @@ async def get_validator_performance(
 
 
 @router.get(
+    "/{net}/account/{account_id}/rewards-available", response_class=JSONResponse
+)
+async def get_bool_account_rewards_available(
+    request: Request,
+    net: str,
+    account_id: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> bool:
+    """
+    Endpoint to get determine if payday rewards are available for an account.
+    """
+    db_to_use = mongomotor.mainnet
+    try:
+        result = await db_to_use[Collections.paydays_rewards].find_one(
+            {"account_id": account_id}
+        )
+
+        return result is not None
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Can't determine whether account {account_id} on {net}  has rewards with error {error}.",
+        )
+
+
+@router.get(
     "/{net}/account/{index}/validator-tally/{skip}/{limit}", response_class=JSONResponse
 )
 async def get_validator_tally(
@@ -343,6 +381,7 @@ async def get_validator_tally(
     limit: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """
     Endpoint to get validator tally data.
@@ -416,6 +455,7 @@ async def get_account_pool_delegators(
     skip: int,
     limit: int,
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """
     Endpoint to get all delegators to pool.
@@ -437,7 +477,7 @@ async def get_account_pool_delegators(
                         net=NET(net),
                     )
                 ]
-            except:
+            except:  # noqa: E722
                 delegators_current_payday = []
 
             try:
@@ -449,23 +489,15 @@ async def get_account_pool_delegators(
                         net=NET(net),
                     )
                 ]
-            except:
+            except:  # noqa: E722
                 delegators_in_block = []
-
-            delegators_in_dict = {x.account: x for x in delegators_in_block}
 
             delegators_current_payday_list = set(
                 [x.account for x in delegators_current_payday]
             )
             delegators_in_block_list = set([x.account for x in delegators_in_block])
 
-            delegators_current_payday_dict = {
-                x.account: x for x in delegators_current_payday
-            }
-            delegators_in_block_dict = {x.account: x for x in delegators_in_block}
-
             new_delegators = delegators_in_block_list - delegators_current_payday_list
-            new_delegators_dict = {x: delegators_in_dict[x] for x in new_delegators}
 
             delegators = sorted(
                 delegators_current_payday, key=lambda x: x.stake, reverse=True
@@ -490,6 +522,7 @@ async def get_account_apy_data(
     net: str,
     index_or_hash: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """
     Endpoint to get account APY data.
@@ -517,6 +550,7 @@ async def get_staking_rewards_object(
     net: str,
     index_or_hash: int | str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """
     Endpoint to get all account info for a given account at the last final block.
@@ -563,6 +597,7 @@ async def get_account_txs(
     skip: int,
     limit: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """
     Endpoint to get all account transactions.
@@ -657,6 +692,7 @@ async def get_account_validator_txs(
     skip: int,
     limit: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """
     Endpoint to get all account validator transactions.

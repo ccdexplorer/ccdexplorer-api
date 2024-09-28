@@ -2,20 +2,21 @@ from ccdexplorer_fundamentals.mongodb import (
     Collections,
     MongoMotor,
 )
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
+from app.ENV import API_KEY_HEADER
+from app.state import get_mongo_motor
 
-from app.state.state import get_mongo_motor
-
-router = APIRouter(tags=["Markets"], prefix="/v1")
+router = APIRouter(tags=["Markets"], prefix="/v2")
 
 
 @router.get(
     "/markets/info",
     response_class=JSONResponse,
 )
-async def get_info_for_token_address(
+async def get_markets_info(
     request: Request,
+    api_key: str = Security(API_KEY_HEADER),
     mongomotor: MongoMotor = Depends(get_mongo_motor),
 ) -> dict:
     """

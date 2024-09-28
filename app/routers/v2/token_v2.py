@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Request, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends, HTTPException, Security
+from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse, RedirectResponse
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
 from ccdexplorer_fundamentals.cis import CIS
@@ -10,7 +11,7 @@ from ccdexplorer_fundamentals.mongodb import (
 )
 from pydantic import BaseModel
 from pymongo import ReplaceOne
-from app.state.state import get_mongo_db, get_grpcclient
+from app.state import get_mongo_db, get_grpcclient
 
 
 class TokenHolding(BaseModel):
@@ -20,7 +21,7 @@ class TokenHolding(BaseModel):
     token_amount: str
 
 
-router = APIRouter(tags=["Token"], prefix="/v1")
+router = APIRouter(tags=["Token"], prefix="/v2")
 
 
 def get_owner_history_for_provenance(
@@ -64,6 +65,7 @@ async def get_info_for_token_address(
     token_id: str | None,
     mongodb: MongoDB = Depends(get_mongo_db),
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
     Endpoint to get information for a given token address. For Provenance Tags specifically, the `owner_history`
@@ -139,6 +141,7 @@ async def add_token_address_without_token_id_to_metadata_refresh_queue(
     contract_index: int,
     contract_subindex: int,
     mongodb: MongoDB = Depends(get_mongo_db),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> RedirectResponse:
     """
     Endpoint to queue a token for a refresh of the metadata from the token metadataUrl where the token_id is None.
@@ -160,6 +163,7 @@ async def add_token_address_to_metadata_refresh_queue(
     contract_subindex: int,
     token_id: str | None,
     mongodb: MongoDB = Depends(get_mongo_db),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
     Endpoint to queue a token for a refresh of the metadata from the token metadataUrl.

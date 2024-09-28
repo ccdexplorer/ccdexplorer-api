@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Request, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends, HTTPException, Security
+from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
 from ccdexplorer_fundamentals.tooter import Tooter, TooterType, TooterChannel  # noqa
 from ccdexplorer_fundamentals.mongodb import (
@@ -6,10 +7,10 @@ from ccdexplorer_fundamentals.mongodb import (
     Collections,
 )
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_BlockInfo
-from app.state.state import get_mongo_motor
+from app.state import get_mongo_motor
 
 
-router = APIRouter(tags=["Blocks"], prefix="/v1")
+router = APIRouter(tags=["Blocks"], prefix="/v2")
 
 
 @router.get("/{net}/blocks/last/{count}", response_class=JSONResponse)
@@ -18,6 +19,7 @@ async def get_last_blocks(
     net: str,
     count: int,
     mongomotor: MongoDB = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> list[CCD_BlockInfo]:
     """
     Endpoint to get the last X blocks as stored in MongoDB collection `blocks`. Maxes out at 50.

@@ -1,0 +1,106 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+<h2>The API</h2>
+<br/>
+<p>The API is authenticated and rate-limited. </p>
+<h4>Authentication</h4>
+<p>API version <b>v1</b> is deprecated and will soon go away. <b>v2</b> is authenticated using a header key <code>x-ccdexplorer-key</code>. 
+    <br/>Assuming that your API key is <code>528e6511-d55a-49d3-a4f1-fcce5eef03cc</code>, then the authentication header you should send will be:
+    <br/><br/>
+    <code>x-ccdexplorer-key: 528e6511-d55a-49d3-a4f1-fcce5eef03cc</code></p>
+    <br/>
+<h4>Rate Limits</h4>
+<p>The v2 API endpoints are all rate limited. For now, there are 2 tiers:</p>
+
+<div class="row ">
+    <div class="col-md-4 ">
+        <div class="card h-100">
+            <div class="p-4">
+                <div class="text-cap fw-medium text-primary mb-1">Free</div>
+                <h4 class="mb-0">EUR 0</h4>
+                
+                </div>
+        <div class="card-body d-flex flex-column justify-content-between">
+            <ul class="list-unstyled d-flex flex-column gap-2">
+            <li class="fs-6 d-flex align-items-baseline">
+            <i class="fa-regular fa-check me-2"></i>
+            
+            <span>2 calls/minute limit</span>
+            </li>
+            <li class="fs-6 d-flex align-items-baseline">
+            <i class="fa-regular fa-check me-2"></i>
+            <span>Up to 100 API calls/day</span>
+            </li>
+            <li class="fs-6 d-flex align-items-baseline">
+            <i class="fa-regular fa-check me-2"></i>
+            <span>All endpoints</span>
+            </li>
+            <span class="small text-muted mb-1">*Link back to the api is required</span>
+            </ul>
+            <a href="/management/keys" class="btn btn-primary py-2 px-8 w-100" type="button">Get API Key</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 ">
+        <div class="card h-100">
+            <div class="p-4">
+                <div class="text-cap fw-medium text-primary mb-1">Standard</div>
+                <h4 class="mb-0">EUROe 50/month</h4>
+                <span class="small text-muted mb-1"></span>
+                
+                </div>
+        <div class="card-body d-flex flex-column justify-content-between">
+            <ul class="list-unstyled d-flex flex-column gap-2">
+            <li class="fs-6 d-flex align-items-baseline">
+            <i class="fa-regular fa-check me-2"></i>
+            
+            <span>2 calls/second limit</span>
+            </li>
+            <li class="fs-6 d-flex align-items-baseline">
+            <i class="fa-regular fa-check me-2"></i>
+            <span>Up to 10,000 API calls/day</span>
+            </li>
+            <li class="fs-6 d-flex align-items-baseline">
+            <i class="fa-regular fa-check me-2"></i>
+            <span>All endpoints</span>
+            </li>
+            
+            </ul>
+            <a href="/management/keys" class="btn btn-primary py-2 px-8 w-100" type="button">Get API Key</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 ">
+        <div class="card h-100">
+            <div class="p-4">
+                <div class="text-cap fw-medium text-primary mb-1">Pro</div>
+                <h4 class="mb-0">Contact me</h4>
+                <span class="small text-muted mb-1"></span>
+                
+                </div>
+        <div class="card-body d-flex flex-column justify-content-between">
+            <ul class="list-unstyled d-flex flex-column gap-2">
+            <li class="fs-6 d-flex align-items-baseline">
+            <i class="fa-regular fa-check me-2"></i>
+            
+            <span>2 calls/second limit</span>
+            </li>
+            <li class="fs-6 d-flex align-items-baseline">
+            <i class="fa-regular fa-check me-2"></i>
+            <span>Up to 50,000 API calls/day</span>
+            </li>
+            <li class="fs-6 d-flex align-items-baseline">
+            <i class="fa-regular fa-check me-2"></i>
+            <span>All endpoints</span>
+            </li>
+            
+            </ul>
+            <a href="/management/keys" class="btn btn-primary py-2 px-8 w-100" type="button">Get API Key</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

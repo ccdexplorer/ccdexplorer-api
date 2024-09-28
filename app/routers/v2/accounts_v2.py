@@ -2,12 +2,13 @@ from ccdexplorer_fundamentals.mongodb import (
     Collections,
     MongoMotor,
 )
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Security
+from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
 
-from app.state.state import get_mongo_motor
+from app.state import get_mongo_motor
 
-router = APIRouter(tags=["Accounts"], prefix="/v1")
+router = APIRouter(tags=["Accounts"], prefix="/v2")
 
 
 @router.get("/{net}/accounts/info/count", response_class=JSONResponse)
@@ -15,6 +16,7 @@ async def get_accounts_count_estimate(
     request: Request,
     net: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> int:
     """
     Endpoint to get the accounts estimated count.

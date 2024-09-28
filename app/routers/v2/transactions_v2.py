@@ -1,15 +1,15 @@
-from fastapi import APIRouter, Request, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends, HTTPException, Security
+from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
-from ccdexplorer_fundamentals.tooter import Tooter, TooterType, TooterChannel  # noqa
 from ccdexplorer_fundamentals.mongodb import (
     MongoMotor,
     Collections,
 )
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_BlockItemSummary
-from app.state.state import get_mongo_motor
+from app.state import get_mongo_motor
 
 
-router = APIRouter(tags=["Transactions"], prefix="/v1")
+router = APIRouter(tags=["Transactions"], prefix="/v2")
 
 
 @router.get("/{net}/transactions/last/{count}", response_class=JSONResponse)
@@ -18,6 +18,7 @@ async def get_last_transactions(
     net: str,
     count: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
 ) -> list[dict]:
     """
     Endpoint to get the last X transactions as stored in MongoDB collection `transactions`. Maxes out at 50.
