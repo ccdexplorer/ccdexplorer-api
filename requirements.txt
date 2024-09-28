@@ -15,7 +15,7 @@ aiohttp
 pydantic==2.4.2
 prometheus-fastapi-instrumentator
 python-dotenv
-asgi-ratelimt
+asgi-ratelimit
 fastapi-login
 passlib
 bcrypt==4.0.1
