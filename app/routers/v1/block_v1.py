@@ -7,7 +7,7 @@ from ccdexplorer_fundamentals.GRPCClient.CCD_Types import (
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from app.state import get_grpcclient
+from app.state_getters import get_grpcclient
 
 router = APIRouter(tags=["Block"], prefix="/v1")
 

@@ -5,7 +5,7 @@ from ccdexplorer_fundamentals.mongodb import (
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
 from app.ENV import API_KEY_HEADER
-from app.state import get_mongo_motor
+from app.state_getters import get_mongo_motor
 
 router = APIRouter(tags=["Markets"], prefix="/v2")
 

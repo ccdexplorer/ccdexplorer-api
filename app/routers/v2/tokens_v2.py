@@ -5,7 +5,7 @@ from ccdexplorer_fundamentals.mongodb import (
     MongoDB,
     Collections,
 )
-from app.state import get_mongo_motor
+from app.state_getters import get_mongo_motor
 
 
 router = APIRouter(tags=["Tokens"], prefix="/v2")

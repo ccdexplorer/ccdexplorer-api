@@ -8,7 +8,7 @@ from ccdexplorer_fundamentals.mongodb import (
 )
 from ccdexplorer_fundamentals.cis import MongoTypeLoggedEvent
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_BlockItemSummary
-from app.state import get_mongo_db
+from app.state_getters import get_mongo_db
 
 
 router = APIRouter(tags=["Transaction"], prefix="/v2")

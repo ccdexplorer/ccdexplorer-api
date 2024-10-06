@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
 
-from app.state import get_grpcclient, get_mongo_motor
+from app.state_getters import get_grpcclient, get_mongo_motor
 
 router = APIRouter(tags=["Misc"], prefix="/v2")
 

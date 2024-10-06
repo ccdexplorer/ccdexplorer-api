@@ -1,0 +1,24 @@
+
+<h4  class="sm-text">Summary</h4>
+{% if not user.plan %}
+  <p>You first need to select a plan before you can request an API key. Go to <a href="/plans">plans</a> to learn more.</p>
+{% else %}
+  <table class="table table-borderless" >
+    <thead></thead>
+    <tbody>
+        <tr>
+            <td class=" text-secondary-emphasis">Plan</td>
+            <td class=" text-secondary-emphasis">{{user.plan.capitalize()}}
+                {% if user.plan == "free" %} (<a href="/" hx-post="/plans/reset" >Upgrade</a>){% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td class=" text-secondary-emphasis">Plan End Date</td>
+            <td class=" text-secondary-emphasis">{{user.plan_end_date|datetime_to_date}} (EOD)</td>
+        </tr>
+
+
+    </tbody>
+
+</table>
+{% endif %}

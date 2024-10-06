@@ -6,7 +6,7 @@ from ccdexplorer_fundamentals.mongodb import (
     Collections,
 )
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_BlockItemSummary
-from app.state import get_mongo_motor
+from app.state_getters import get_mongo_motor
 
 
 router = APIRouter(tags=["Transactions"], prefix="/v2")

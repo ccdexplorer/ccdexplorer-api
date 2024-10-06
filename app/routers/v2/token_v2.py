@@ -11,7 +11,7 @@ from ccdexplorer_fundamentals.mongodb import (
 )
 from pydantic import BaseModel
 from pymongo import ReplaceOne
-from app.state import get_mongo_db, get_grpcclient
+from app.state_getters import get_mongo_db, get_grpcclient
 
 
 class TokenHolding(BaseModel):

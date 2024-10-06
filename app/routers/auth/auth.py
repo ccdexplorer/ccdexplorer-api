@@ -5,14 +5,15 @@ from ccdexplorer_fundamentals.mongodb import MongoMotor
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi_login.exceptions import InvalidCredentialsException
+
 from pymongo import ReplaceOne
 
 from app.models import User
-from app.ENV import environment
+from app.ENV import environment, API_NET, API_URL
 from app.jinja2_helpers import templates
 from app.security import hash_password, manager, verify_password
-from app.state import get_mongo_motor, get_user_details
+from app.state_getters import get_mongo_motor, get_user_details
+import datetime as dt
 
 motormongo = MongoMotor(None)
 
@@ -54,6 +55,7 @@ def login_get(request: Request):
 def register_get(request: Request):
     context = {
         "request": request,
+        "env": environment,
     }
     return templates.TemplateResponse("auth/register.html", context)
 
@@ -73,19 +75,45 @@ async def login(
     if user is None:
         error = "Can't find user and/or password is wrong. "
 
-    if not verify_password(form_data.password, user.password):
-        error = "Can't find user and/or password is wrong. "
+    if user:
+        if not verify_password(form_data.password, user.password):
+            error = "Can't find user and/or password is wrong. "
 
     if error:
-        context = {"request": request, "env": environment, "error": error}
-        return templates.TemplateResponse("auth/error.html", context)
-    response = RedirectResponse(url="/", status_code=303)
+        context = {"request": request, "env": environment, "errors": [error]}
+
+        return templates.TemplateResponse("auth/login.html", context)
+    response = RedirectResponse(url="/account", status_code=303)
     manager.set_cookie(response, user.token)
     return response
 
 
+async def get_next_alias_id_and_account_id(db: MongoMotor):
+    result = (
+        await db.utilities_db["api_users"]
+        .find()
+        .sort({"alias_id": -1})
+        .limit(1)
+        .to_list(length=1)
+    )
+    if len(result) > 0:
+        max_alias_id = result[0]["alias_id"]
+    else:
+        # no users found, so start at 0
+        max_alias_id = -1
+    next_alias_id = int(max_alias_id) + 1
+    pipeline = [
+        {"$match": {"net": API_NET}},
+        {"$match": {"alias_id": next_alias_id}},
+    ]
+    result = await db.utilities_db["api_aliases"].aggregate(pipeline).to_list(length=1)
+    alias_account_id = result[0]["alias"]
+    return next_alias_id, alias_account_id
+
+
 @router.post("/register", status_code=201)
 async def register(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: MongoMotor = Depends(get_mongo_motor),
 ):
@@ -93,26 +121,38 @@ async def register(
     Registers a new user
     """
     user = await get_user_by_email(form_data.username, db)
+    next_alias_id, alias_account_id = await get_next_alias_id_and_account_id(db)
     if user is None:
         user = User(
+            scope=API_URL,
             api_account_id=str(uuid4()),
+            alias_id=next_alias_id,
+            alias_account_id=alias_account_id,
             token=str(uuid4()),
             email=form_data.username,
             password=hash_password(form_data.password),
             is_admin=False,
+            plan_end_date=dt.datetime.now().astimezone(dt.UTC),
         )
         db.utilities_db["api_users"].bulk_write(
             [
                 ReplaceOne(
-                    {"_id": user.email},
+                    {"_id": user.api_account_id},
                     user.model_dump(exclude_none=True),
                     upsert=True,
                 )
             ]
         )
+        response = RedirectResponse(url="/auth/login", status_code=303)
+        return response
 
     else:
-        pass
+        context = {
+            "request": request,
+            "env": environment,
+            "errors": ["email address already registered."],
+        }
+    return templates.TemplateResponse("auth/register.html", context)
 
 
 @router.get("/logout")

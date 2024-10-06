@@ -7,7 +7,7 @@ from ccdexplorer_fundamentals.mongodb import (
     Collections,
 )
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_BlockInfo
-from app.state import get_mongo_motor
+from app.state_getters import get_mongo_motor
 
 
 router = APIRouter(tags=["Blocks"], prefix="/v2")

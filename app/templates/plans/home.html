@@ -5,13 +5,23 @@
 <br/>
 <p>The API is authenticated and rate-limited. </p>
 <h4>Authentication</h4>
-<p>API version <b>v1</b> is deprecated and will soon go away. <b>v2</b> is authenticated using a header key <code>x-ccdexplorer-key</code>. 
+<p>API <b>v2</b> is authenticated using a header key <code>x-ccdexplorer-key</code>. 
     <br/>Assuming that your API key is <code>528e6511-d55a-49d3-a4f1-fcce5eef03cc</code>, then the authentication header you should send will be:
     <br/><br/>
     <code>x-ccdexplorer-key: 528e6511-d55a-49d3-a4f1-fcce5eef03cc</code></p>
     <br/>
 <h4>Rate Limits</h4>
-<p>The v2 API endpoints are all rate limited. For now, there are 2 tiers:</p>
+<p>The v2 API endpoints are all rate limited.</p>
+
+<h4>Purchase Process</h4>
+<ol>
+    <li>Select a Plan below. </li>
+    <li>If you are already logged in, you can continue to the next step, otherwise you can create an account.</li>
+    <li>For the paid plans (Standard/Pro), payment is in EUROe tokens.
+    </li>
+    
+</ol>
+
 
 <div class="row ">
     <div class="col-md-4 ">
@@ -38,7 +48,8 @@
             </li>
             <span class="small text-muted mb-1">*Link back to the api is required</span>
             </ul>
-            <a href="/management/keys" class="btn btn-primary py-2 px-8 w-100" type="button">Get API Key</a>
+            <button hx-post="/plans/set"    hx-vals='{"plan": "free"}' {% if user.plan %} disabled {% endif %} class="btn btn-primary">Get Free Plan</button>
+            
             </div>
         </div>
     </div>
@@ -47,7 +58,7 @@
         <div class="card h-100">
             <div class="p-4">
                 <div class="text-cap fw-medium text-primary mb-1">Standard</div>
-                <h4 class="mb-0">EUROe 50/month</h4>
+                <h4 class="mb-0">EUROe 1 / day</h4>
                 <span class="small text-muted mb-1"></span>
                 
                 </div>
@@ -68,7 +79,8 @@
             </li>
             
             </ul>
-            <a href="/management/keys" class="btn btn-primary py-2 px-8 w-100" type="button">Get API Key</a>
+            
+            <button hx-post="/plans/set"  hx-vals='{"plan": "standard"}' {% if user.plan %} disabled {% endif %} class="btn btn-primary">Get Standard Plan</button>
             </div>
         </div>
     </div>
@@ -77,7 +89,7 @@
         <div class="card h-100">
             <div class="p-4">
                 <div class="text-cap fw-medium text-primary mb-1">Pro</div>
-                <h4 class="mb-0">Contact me</h4>
+                <h4 class="mb-0">EUROe 3 / day</h4>
                 <span class="small text-muted mb-1"></span>
                 
                 </div>
@@ -90,7 +102,7 @@
             </li>
             <li class="fs-6 d-flex align-items-baseline">
             <i class="fa-regular fa-check me-2"></i>
-            <span>Up to 50,000 API calls/day</span>
+            <span>Up to 100,000 API calls/day</span>
             </li>
             <li class="fs-6 d-flex align-items-baseline">
             <i class="fa-regular fa-check me-2"></i>
@@ -98,7 +110,7 @@
             </li>
             
             </ul>
-            <a href="/management/keys" class="btn btn-primary py-2 px-8 w-100" type="button">Get API Key</a>
+            <button hx-post="/plans/set"    hx-vals='{"plan": "pro"}' {% if user.plan %} disabled {% endif %} class="btn btn-primary">Get Pro Plan</button>
             </div>
         </div>
     </div>

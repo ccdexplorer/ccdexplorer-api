@@ -4,6 +4,7 @@ from typing import Tuple
 from fastapi.responses import JSONResponse
 from ratelimit.auths import EmptyInformation
 from ratelimit.types import ASGIApp, Receive, Scope, Send
+from app.state_getters import get_api_keys
 
 
 async def handle_auth_error(exc: Exception) -> ASGIApp:
@@ -37,7 +38,10 @@ async def AUTH_FUNCTION(scope: Scope) -> Tuple[str, str]:
     To gain access to v2 API
     """
     app = scope["app"]
-    api_keys: dict = app.api_keys
+    if not app.api_keys:
+        api_keys: dict = await get_api_keys(motormongo=app.motormongo, app=app)
+    else:
+        api_keys = app.api_keys
     api_account_id, group_name = None, None
 
     headers: list[Tuple[bytes, bytes]] = scope["headers"]

@@ -4,7 +4,7 @@ import datetime as dt
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from functools import lru_cache
-
+import httpx
 import requests
 import urllib3
 from ccdexplorer_fundamentals.enums import NET
@@ -19,7 +19,7 @@ from fastapi_restful.tasks import repeat_every
 from prometheus_fastapi_instrumentator import Instrumentator
 from rich import print
 
-from app.state import *
+from app.state_getters import *
 
 urllib3.disable_warnings()
 
@@ -27,8 +27,9 @@ from ccdexplorer_fundamentals.GRPCClient import GRPCClient
 from ccdexplorer_fundamentals.tooter import Tooter
 from app.ENV import *
 from app.routers.auth import auth
-from app.routers.management import management
+from app.routers.account import account
 from app.routers.home import home
+from app.routers.plans import plans
 
 # V1
 from app.routers.v1 import block_v1
@@ -71,12 +72,16 @@ from app.ratelimiting import AUTH_FUNCTION, handle_429, handle_auth_error
 async def lifespan(app: FastAPI):
     app.templates = Jinja2Templates(directory="app/templates")
     app.grpcclient = grpcclient
+    app.api_url = environment["API_URL"]
+    app.httpx_client = httpx.AsyncClient(
+        timeout=None, headers={"x-ccdexplorer-key": environment["CCDEXPLORER_API_KEY"]}
+    )
     app.tooter = tooter
     app.mongodb = mongodb
     app.motormongo = motormongo
     init_time = dt.datetime.now().astimezone(dt.timezone.utc) - timedelta(seconds=10)
     app.users_last_requested = init_time
-    app.state.api_keys = await get_api_keys(motormongo=motormongo, app=app)
+    app.api_keys = await get_api_keys(motormongo=motormongo, app=app)
     yield
     # Any cleanup should happen here
     pass
@@ -179,4 +184,5 @@ app.include_router(misc_v2.router)
 # auth, content, key management
 app.include_router(auth.router)
 app.include_router(home.router)
-app.include_router(management.router)
+app.include_router(account.router)
+app.include_router(plans.router)

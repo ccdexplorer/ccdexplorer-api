@@ -1,9 +1,12 @@
 from fastapi import Request
-
+from app.ENV import API_URL
 import datetime as dt
 from app.models import User
 
+
 # from ccdexplorer_fundamentals.mongodb import MongoMotor
+async def get_httpx_client(req: Request):
+    return req.app.httpx_client
 
 
 def get_and_save_user_from_collection(req: Request):
@@ -56,23 +59,26 @@ async def get_api_keys(req: Request = None, motormongo=None, app=None):
                 dt.datetime.now().astimezone(dt.timezone.utc)
                 - req.app.api_keys_last_requested
             ).total_seconds()
-            < 60
+            < 10
         ) and (req.app.api_keys):
             pass
 
     else:
+        now = dt.datetime.now().astimezone(dt.UTC)
+        pipeline = [
+            {"$match": {"scope": API_URL}},
+            {"$match": {"api_key_end_date": {"$gte": now}}},
+        ]
+
+        db = motormongo.utilities_db if motormongo else req.app.motormongo.utilities_db
+
+        keys = {
+            x["_id"]: x
+            for x in await db["api_api_keys"].aggregate(pipeline).to_list(length=None)
+        }
         if motormongo:
-            db = motormongo.utilities_db
-            app.api_keys = {
-                x["_id"]: x
-                for x in await db["api_api_keys"].find({}).to_list(length=None)
-            }
+            app.api_keys = keys
+            app.api_keys_last_requested = now
         else:
-            db = req.app.motormongo.utilities_db
-            req.app.api_keys = {
-                x["_id"]: x
-                for x in await db["api_api_keys"].find({}).to_list(length=None)
-            }
-            req.app.api_keys_last_requested = dt.datetime.now().astimezone(
-                dt.timezone.utc
-            )
+            req.app.api_keys = keys
+            req.app.api_keys_last_requested = now

@@ -1,5 +1,6 @@
 import grpc
 from ccdexplorer_fundamentals.enums import NET
+from ccdexplorer_fundamentals.cis import MongoTypeLoggedEvent
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import (
     CCD_AccountInfo,
@@ -19,7 +20,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import datetime as dt
 from pymongo import DESCENDING, ASCENDING
-from app.state import get_grpcclient, get_mongo_db, get_mongo_motor
+from app.state_getters import get_grpcclient, get_mongo_db, get_mongo_motor
 
 
 class TokenHolding(BaseModel):
@@ -30,6 +31,44 @@ class TokenHolding(BaseModel):
 
 
 router = APIRouter(tags=["Account"], prefix="/v2")
+
+
+@router.get(
+    "/{net}/account/{account_address}/received-tokens/{contract_index}/{contract_subindex}",
+    response_class=JSONResponse,
+)
+async def get_account_tokens_received(
+    request: Request,
+    net: str,
+    account_address: str,
+    contract_index: int,
+    contract_subindex: int,
+    mongodb: MongoDB = Depends(get_mongo_db),
+    api_key: str = Security(API_KEY_HEADER),
+) -> list[TokenHolding]:
+    """
+    Endpoint to get all received tokens for a given account, as stored in MongoDB collection `tokens_logged_events`.
+
+
+    """
+    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    pipeline = [
+        {"$match": {"contract": f"<{contract_index},{contract_subindex}>"}},
+        {"$match": {"event_type": "transfer_event"}},
+        {"$match": {"result.to_address": f"{account_address}"}},
+    ]
+    result_list = list(db_to_use[Collections.tokens_logged_events].aggregate(pipeline))
+
+    logged_events = [MongoTypeLoggedEvent(**x) for x in result_list]
+
+    if len(logged_events) > 0:
+
+        return logged_events
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested account ({account_address}) has not received tokens from contract <{contract_index},{contract_subindex}> on {net}",
+        )
 
 
 @router.get("/{net}/account/{account_address}/tokens", response_class=JSONResponse)

@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 import json
 import base64
 
-from app.state import get_grpcclient, get_mongo_motor
+from app.state_getters import get_grpcclient, get_mongo_motor
 
 router = APIRouter(tags=["Contract"], prefix="/v2")
 

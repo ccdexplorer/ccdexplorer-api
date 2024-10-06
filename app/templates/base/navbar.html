@@ -6,7 +6,20 @@
         <div class="collapse navbar-collapse" id="navbarSupportedContent">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
             
-                {% if not user %}
+                
+            <li class="nav-item"></li>
+                <a class="nav-link " href="/plans" role="button" aria-expanded="false">
+                Plans
+                </a>
+            </li>
+            <!-- <div class="vr d-none d-lg-block ms-3 me-3" ></div> -->
+            <li class="nav-item"></li>
+                <a class="nav-link " href="/docs" role="button" aria-expanded="false">
+                Documentation
+                </a>
+            </li>
+            <div class="vr d-none d-lg-block ms-3 me-3" ></div>
+            {% if not user %}
             <li class="nav-item">
                 <a class="nav-link " href="/auth/login" role="button" aria-expanded="false">
                 Login
@@ -14,18 +27,16 @@
             </li>
             {% else %}
             <li class="nav-item">
-                <a class="nav-link " href="/auth/logout" role="button" aria-expanded="false">
-                Logged in as {{user.email}} (logout)
+                <a class="nav-link " href="/account" role="button" aria-expanded="false">
+                Account
                 </a>
+            </li>   
+            <li class="nav-item">
+                <a class="nav-link " href="/auth/logout" role="button" aria-expanded="false">
+                    (logout)
+                    </a>
             </li>
             {% endif %}
-            <!-- <div class="vr d-none d-lg-block ms-3 me-3" ></div> -->
-            <li class="nav-item"></li>
-                <a class="nav-link " href="/docs" role="button" aria-expanded="false">
-                Documentation
-                </a>
-            </li>
-            
          
     </ul>
     
