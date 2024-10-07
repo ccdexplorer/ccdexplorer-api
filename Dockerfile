@@ -10,6 +10,6 @@ COPY ./node_modules/bootstrap-icons/font/bootstrap-icons.min.css /code/node_modu
 COPY ./node_modules/bootstrap-icons/font/fonts /code/node_modules/bootstrap-icons/font/fonts
 COPY ./node_modules/bootstrap/dist/js/bootstrap.bundle.min.js /code/node_modules/bootstrap/dist/js/bootstrap.bundle.min.js
 # COPY ./node_modules/plotly.js-dist/plotly.js /code/node_modules/plotly.js-dist/plotly.js
-COPY ./node_modules/htmx/htmx.js /code/node_modules/htmx/htmx.js
+COPY ./node_modules/htmx.org/dist/htmx.js /code/node_modules/htmx.org/dist/htmx.js
 
 CMD ["uvicorn", "app.main:app",  "--log-level", "info", "--proxy-headers", "--host", "0.0.0.0", "--port", "80"]
