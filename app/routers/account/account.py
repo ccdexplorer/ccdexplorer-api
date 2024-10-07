@@ -130,7 +130,11 @@ async def account_home(
     user.active = user.plan_end_date.astimezone(dt.UTC) > dt.datetime.now().astimezone(
         dt.UTC
     )
-    plan_daily_limit = plans[APIPlans[user.plan]].day_limit
+    if user.plan:
+        plan_daily_limit = plans[APIPlans[user.plan]].day_limit
+    else:
+        plan_daily_limit = None
+
     # redis key info
 
     # for sliding_window use these
