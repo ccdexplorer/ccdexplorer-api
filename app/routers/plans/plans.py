@@ -15,7 +15,7 @@ router = APIRouter(include_in_schema=False)
 
 
 @router.post(
-    "/plans/set/",
+    "/plans/set",
 )
 async def plans_set_plan(
     request: Request,
@@ -55,7 +55,7 @@ async def plans_set_plan(
 
 
 @router.post(
-    "/plans/reset/",
+    "/plans/reset",
 )
 async def plans_reset_plan(
     request: Request,
