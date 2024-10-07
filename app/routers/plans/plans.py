@@ -20,6 +20,11 @@ router = APIRouter(include_in_schema=False)
 async def plans_set_plan(
     request: Request,
 ):
+    user: User = get_user_details(request)
+    if not user:
+        response = RedirectResponse(url="/auth/login", status_code=200)
+        response.headers["HX-Redirect"] = "/auth/login"
+        return response
 
     plan = "free"
     body = await request.body()

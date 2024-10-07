@@ -25,4 +25,4 @@ async def home_route(request: Request):
     #     if not isinstance(user, User):
     #         user = User(**user)
     context = {"request": request, "env": environment, "user": user}
-    return templates.TemplateResponse("base/home.html", context)
+    return templates.TemplateResponse("plans/home.html", context)

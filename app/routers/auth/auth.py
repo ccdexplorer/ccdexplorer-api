@@ -89,13 +89,13 @@ async def login(
 
 
 async def get_next_alias_id_and_account_id(db: MongoMotor):
-    result = (
-        await db.utilities_db["api_users"]
-        .find()
-        .sort({"alias_id": -1})
-        .limit(1)
-        .to_list(length=1)
-    )
+    pipeline = [
+        # accounts should be valid on all scopes
+        # {"$match": {"scope": API_URL}},
+        {"$sort": {"alias_id": -1}},
+        {"$limit": 1},
+    ]
+    result = await db.utilities_db["api_users"].aggregate(pipeline).to_list(length=1)
     if len(result) > 0:
         max_alias_id = result[0]["alias_id"]
     else:

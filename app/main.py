@@ -26,6 +26,7 @@ urllib3.disable_warnings()
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
 from ccdexplorer_fundamentals.tooter import Tooter
 from app.ENV import *
+from app.models import rate_limit_rules
 from app.routers.auth import auth
 from app.routers.account import account
 from app.routers.home import home
@@ -58,12 +59,13 @@ motormongo = MongoMotor(tooter)
 # ratelimit
 from typing import Tuple
 
-# fastapi-login
-from fastapi_login import LoginManager
 from ratelimit import RateLimitMiddleware, Rule
 from ratelimit.auths import EmptyInformation
 from ratelimit.auths.session import from_session
 from ratelimit.backends.simple import MemoryBackend
+from redis.asyncio import StrictRedis
+from ratelimit.backends.slidingredis import SlidingRedisBackend
+from ratelimit.backends.redis import RedisBackend
 from ratelimit.types import ASGIApp, Receive, Scope, Send
 from app.ratelimiting import AUTH_FUNCTION, handle_429, handle_auth_error
 
@@ -72,6 +74,7 @@ from app.ratelimiting import AUTH_FUNCTION, handle_429, handle_auth_error
 async def lifespan(app: FastAPI):
     app.templates = Jinja2Templates(directory="app/templates")
     app.grpcclient = grpcclient
+    app.redis = StrictRedis.from_url(REDIS_URL)
     app.api_url = environment["API_URL"]
     app.httpx_client = httpx.AsyncClient(
         timeout=None, headers={"x-ccdexplorer-key": environment["CCDEXPLORER_API_KEY"]}
@@ -147,20 +150,11 @@ app.add_middleware(
 app.add_middleware(
     RateLimitMiddleware,
     authenticate=AUTH_FUNCTION,
-    backend=MemoryBackend(),
+    # backend=SlidingRedisBackend(StrictRedis.from_url(REDIS_URL)),
+    backend=RedisBackend(StrictRedis.from_url(REDIS_URL)),
     on_auth_error=handle_auth_error,
     on_blocked=handle_429,
-    config={
-        r"^/user": [
-            Rule(group="ccdexplorer.io"),
-        ],
-        r"^/v2": [
-            Rule(day=100, minute=4, group="free", zone="v2"),
-            Rule(day=1_000, second=2, group="standard", zone="v2"),
-            Rule(group="ccdexplorer.io"),
-            Rule(group="unrestricted", second=5, zone="v2"),
-        ],
-    },
+    config={r"^/v2": rate_limit_rules},
 )
 
 instrumentator = Instrumentator().instrument(app)

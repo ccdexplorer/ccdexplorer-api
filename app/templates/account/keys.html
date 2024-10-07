@@ -6,7 +6,7 @@
     {% if (user.plan=="free") or (user.payments|length > 0) %}
     
       {% include "/account/current_keys.html"%}
-      {% if user_api_keys|length < 10 %}
+      {% if user_api_keys|length < 3 %}
         <button hx-post="/account/new-key"   class="btn btn-primary btn-sm" >Request Key</button>
       {% endif %}
     {% else %}

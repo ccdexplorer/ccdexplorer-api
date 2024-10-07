@@ -82,3 +82,4 @@ async def get_api_keys(req: Request = None, motormongo=None, app=None):
         else:
             req.app.api_keys = keys
             req.app.api_keys_last_requested = now
+    return keys

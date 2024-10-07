@@ -30,6 +30,8 @@ router = APIRouter(include_in_schema=False)
 
 
 async def get_user_api_keys(user, mongomotor):
+    """This function gets all API keys for the logged in user
+    that belong to the scope where are in (localhost, dev, prod)."""
     pipeline = [
         {"$match": {"scope": API_URL}},
         {"$match": {"api_account_id": user.api_account_id}},
@@ -46,6 +48,7 @@ async def get_user_api_keys(user, mongomotor):
 async def get_payment_tx_and_update_payments(
     request: Request, user: User, db_to_use, euroe_tag: dict, token_address: str
 ):
+    """The logged in user"""
     pipeline = [
         {"$match": {"result.to_address": user.alias_account_id}},
         {"$match": {"token_address": token_address}},
@@ -65,7 +68,7 @@ async def get_payment_tx_and_update_payments(
                 math.pow(10, -euroe_tag["decimals"])
             )
             if amount_euroe > 0:
-                days = amount_euroe / plans[APIPlans[user.plan]].rate
+                days = amount_euroe / plans[APIPlans[user.plan]].euro_rate
             else:
                 days = 0
             user.payments[event.tx_hash] = APIPayment(
@@ -124,6 +127,23 @@ async def account_home(
 
     # reload from collection
     user: User = get_user_details(request)
+    user.active = user.plan_end_date > dt.datetime.now().astimezone(dt.UTC)
+    plan_daily_limit = plans[APIPlans[user.plan]].day_limit
+    # redis key info
+
+    # for sliding_window use these
+    # day_calls_made = await request.app.redis.zcard(f"v2:*:{user.api_account_id}:day")
+    # day_calls_remaining = plans[APIPlans[user.plan]].day_limit - day_calls_made
+
+    # for normal redis use these
+    day_calls_remaining = await request.app.redis.get(f"v2:*:{user.api_account_id}:day")
+    if day_calls_remaining:
+        day_calls_remaining = day_calls_remaining.decode()
+    else:
+        day_calls_remaining = plan_daily_limit
+    ttl = await request.app.redis.ttl(f"v2:*:{user.api_account_id}:day")
+
+    ttl_date = dt.datetime.now().astimezone(dt.UTC) + dt.timedelta(seconds=ttl)
     context = {
         "request": request,
         "env": environment,
@@ -131,6 +151,10 @@ async def account_home(
         "user_api_keys": user_api_keys,
         "sample_key": sample_key,
         "total_paid_amount": total_paid_amount,
+        "day_calls_remaining": day_calls_remaining,
+        "ttl_date": ttl_date,
+        "ttl": ttl,
+        "plan_daily_limit": plan_daily_limit,
         "net": API_NET,
     }
     return templates.TemplateResponse("account/home.html", context)
@@ -194,15 +218,11 @@ async def account_new_key(
         # id=key_id,
         api_key_end_date=api_key_end_date,
     )
-
+    key_to_add = key_to_add.model_dump()
+    if "id" in key_to_add:
+        del key_to_add["id"]
     request.app.motormongo.utilities_db["api_api_keys"].bulk_write(
-        [
-            ReplaceOne(
-                {"_id": key_id},
-                key_to_add.model_dump(),
-                upsert=True,
-            )
-        ]
+        [ReplaceOne({"_id": key_id}, key_to_add, upsert=True)]
     )
     request.app.api_keys = await get_api_keys(motormongo=mongomotor, app=request.app)
     response = RedirectResponse(url="/account", status_code=200)
@@ -258,7 +278,7 @@ async def set_end_date_for_plan(user: User, mongomotor: MongoMotor):
                 # and the next payment
                 end_date = start_date + dt.timedelta(days=tx.paid_days_for_plan)
 
-    user.plan_end_date = dt.datetime.combine(end_date, dt.time.max)
+    user.plan_end_date = dt.datetime.combine(end_date, dt.time.max).astimezone(dt.UTC)
     # write back to user
     _ = await mongomotor.utilities[CollectionsUtilities.api_users].bulk_write(
         [

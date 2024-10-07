@@ -1,12 +1,18 @@
-from pydantic import BaseModel, Field
-from typing import Optional
-from enum import Enum
+from __future__ import annotations
+
 import datetime as dt
+from enum import Enum
+from typing import Optional
+from ratelimit import Rule
+from pydantic import BaseModel, Field
 
 
 class APIPlansDetail(BaseModel):
     plan_name: str
-    rate: float
+    euro_rate: float
+    day_limit: Optional[int] = 0
+    min_limit: Optional[int] = 0
+    sec_limit: Optional[int] = 0
 
 
 class APIPlans(Enum):
@@ -16,21 +22,53 @@ class APIPlans(Enum):
     unrestricted = "Unrestricted"
 
 
-plans = {}
-plans.update(
-    {APIPlans.free: APIPlansDetail(plan_name=APIPlans.free.value, rate=0.0000001)}
-)
-plans.update(
-    {APIPlans.standard: APIPlansDetail(plan_name=APIPlans.standard.value, rate=1)}
-)
-plans.update({APIPlans.pro: APIPlansDetail(plan_name=APIPlans.pro.value, rate=3)})
+plans: dict[APIPlans, APIPlansDetail] = {}
 plans.update(
     {
-        APIPlans.unrestricted: APIPlansDetail(
-            plan_name=APIPlans.unrestricted.value, rate=0.0000001
+        APIPlans.free: APIPlansDetail(
+            plan_name=APIPlans.free.value,
+            euro_rate=0.0000001,
+            day_limit=100,
+            min_limit=2,
         )
     }
 )
+plans.update(
+    {
+        APIPlans.standard: APIPlansDetail(
+            plan_name=APIPlans.standard.value,
+            euro_rate=1,
+            day_limit=10_000,
+            sec_limit=2,
+        )
+    }
+)
+plans.update(
+    {
+        APIPlans.pro: APIPlansDetail(
+            plan_name=APIPlans.pro.value, euro_rate=3, day_limit=100_000, sec_limit=2
+        )
+    }
+)
+plans.update(
+    {
+        APIPlans.unrestricted: APIPlansDetail(
+            plan_name=APIPlans.unrestricted.value, euro_rate=0.0000001, sec_limit=5
+        )
+    }
+)
+
+rate_limit_rules = []
+for plan, detail in plans.items():
+    day = detail.day_limit if detail.day_limit else None
+    min = detail.min_limit if detail.min_limit else None
+    sec = detail.sec_limit if detail.sec_limit else None
+    group = plan.value.lower()
+    zone = "v2"
+    rate_limit_rules.append(
+        Rule(day=day, minute=min, second=sec, group=group, zone=zone)
+    )
+rate_limit_rules.append(Rule(group="ccdexplorer.io"))
 
 
 class APIPayment(BaseModel):

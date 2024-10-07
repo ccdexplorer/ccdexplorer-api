@@ -10,18 +10,18 @@
                 <table class="table">
                     <thead>
                         <tr class="sm-text">
-                            <th>Date</th>
-                            <th class="text-end">Hash</th>
-                            <th class="text-end">Paid</th>
-                            <th class="text-end">Days on {{user.plan}} plan</th>
+                            <th class=" text-secondary-emphasis">Date</th>
+                            <th class="text-end text-secondary-emphasis">Hash</th>
+                            <th class="text-end text-secondary-emphasis">Paid</th>
+                            <th class="text-end text-secondary-emphasis">Days on plan</th>
                         </tr>
                     </thead>
                     {% for hash, payment in user.payments.items() %}
                     <tr class="sm-text">
-                    <td>{{payment.tx_date}}</td>
-                    <td class="text-end"><a href="https://ccdexplorer.io/{{net}}/transaction/{{hash}}">{{hash[:4]}}</a></td>
-                    <td class="text-end">{{payment.amount_euroe}} EUROe</td>
-                    <td class="text-end">{{payment.paid_days_for_plan}}</td>
+                    <td class=" text-secondary-emphasis">{{payment.tx_date}}</td>
+                    <td class="text-end text-secondary-emphasis"><a href="https://ccdexplorer.io/{{net}}/transaction/{{hash}}">{{hash[:4]}}</a></td>
+                    <td class="text-end text-secondary-emphasis">{{payment.amount_euroe}} EUROe</td>
+                    <td class="text-end text-secondary-emphasis">{{payment.paid_days_for_plan}}</td>
                     </tr>
                     {% endfor %}
                 </table>

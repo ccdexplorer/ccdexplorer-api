@@ -6,18 +6,39 @@
   <table class="table table-borderless" >
     <thead></thead>
     <tbody>
-        <tr>
+        <tr class="sm-text">
+            <td class=" text-secondary-emphasis">Username</td>
+            <td class=" text-secondary-emphasis">{{user.email}}</td>
+        </tr>
+        <tr class="sm-text">
             <td class=" text-secondary-emphasis">Plan</td>
             <td class=" text-secondary-emphasis">{{user.plan.capitalize()}}
                 {% if user.plan == "free" %} (<a href="/" hx-post="/plans/reset" >Upgrade</a>){% endif %}
             </td>
         </tr>
-        <tr>
-            <td class=" text-secondary-emphasis">Plan End Date</td>
-            <td class=" text-secondary-emphasis">{{user.plan_end_date|datetime_to_date}} (EOD)</td>
+        {% if user.plan != "free" %}
+         {% if user.active%}
+            <tr class="sm-text">
+                <td class=" text-secondary-emphasis">Plan End Date<br/><small>* End of Day</small></td>
+                <td class=" text-secondary-emphasis">{% if user.active%}{{user.plan_end_date|datetime_to_date}}{% else %}-{%endif%}</td>
+            </tr>
+            {%endif%}
+            <tr class="sm-text">
+                <td class=" text-secondary-emphasis">Plan Active?</td>
+                <td class=" text-secondary-emphasis">{{user.active}}</td>
+            </tr>
+            
+        {%endif%}
+        {% if user.active%}
+        <tr class="sm-text">
+            <td class=" text-secondary-emphasis">API Calls Remaining</td>
+            <td class=" text-secondary-emphasis">{{day_calls_remaining|seperator_no_decimals}} /  {{plan_daily_limit|seperator_no_decimals}} per day</td>
         </tr>
-
-
+        <tr class="sm-text">
+            <td class=" text-secondary-emphasis">API Call Limit Reset</td>
+            <td class=" text-secondary-emphasis">{% if ttl == -2 %}-{% else %}{{ttl_date|datetime_to_date_and_time_no_sec}}{% endif %}</td>
+        </tr>
+        {%endif%}
     </tbody>
 
 </table>

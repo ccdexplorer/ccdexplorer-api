@@ -23,9 +23,11 @@
 /node_modules/plotly.js-dist/*
 !/node_modules/plotly.js-dist/plotly.js
 
-!/node_modules/htmx/
-/node_modules/htmx/*
-!/node_modules/htmx/htmx.js
+!/node_modules/htmx.org/
+/node_modules/htmx.org/*
+!/node_modules/htmx.org/dist/
+/node_modules/htmx.org/dist/*
+!/node_modules/htmx.org/dist/htmx.js
 
 !/custom_scss
 /custom_scss/*
