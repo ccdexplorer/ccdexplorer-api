@@ -127,7 +127,9 @@ async def account_home(
 
     # reload from collection
     user: User = get_user_details(request)
-    user.active = user.plan_end_date > dt.datetime.now().astimezone(dt.UTC)
+    user.active = user.plan_end_date.astimezone(dt.UTC) > dt.datetime.now().astimezone(
+        dt.UTC
+    )
     plan_daily_limit = plans[APIPlans[user.plan]].day_limit
     # redis key info
 
