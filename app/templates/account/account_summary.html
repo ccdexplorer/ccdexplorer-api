@@ -20,7 +20,7 @@
          {% if user.active%}
             <tr class="sm-text">
                 <td class=" text-secondary-emphasis">Plan End Date<br/><small>* End of Day</small></td>
-                <td class=" text-secondary-emphasis">{% if user.active%}{{user.plan_end_date|datetime_to_date}}{% else %}-{%endif%}</td>
+                <td class=" text-secondary-emphasis">{% if user.active%}{{user.plan_end_date|datetime_to_date_and_time_no_sec}}{% else %}-{%endif%}</td>
             </tr>
             {%endif%}
             <tr class="sm-text">

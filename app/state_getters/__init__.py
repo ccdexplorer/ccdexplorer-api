@@ -61,7 +61,7 @@ async def get_api_keys(req: Request = None, motormongo=None, app=None):
             ).total_seconds()
             < 10
         ) and (req.app.api_keys):
-            pass
+            req.app.api_keys
 
     else:
         now = dt.datetime.now().astimezone(dt.UTC)

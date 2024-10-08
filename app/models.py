@@ -75,7 +75,7 @@ class APIPayment(BaseModel):
     tx_hash: str
     tx_date: str
     amount_euroe: float
-    paid_days_for_plan: int  # this is the result of the amount and the plan type
+    paid_days_for_plan: float  # this is the result of the amount and the plan type
     # if users want to change paid plans, this lets us retroactively change the
     # paid days. For example, suppose a user starts with the Standard plan and pays 100 EUROe
     # for 100 paid days. If they decide to change to the Pro plan after 10 days,

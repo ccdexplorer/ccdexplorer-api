@@ -110,7 +110,7 @@ async def account_home(
         if API_NET == "testnet"
         else request.app.motormongo.mainnet
     )
-    token_address = "<7260,0>-" if API_NET == "testnet" else "<9390,>-"
+    token_address = "<7260,0>-" if API_NET == "testnet" else "<9390,0>-"
     euroe_tag = await db_to_use[Collections.tokens_tags].find_one({"_id": "EUROe"})
 
     _ = await get_payment_tx_and_update_payments(
@@ -132,8 +132,10 @@ async def account_home(
     )
     if user.plan:
         plan_daily_limit = plans[APIPlans[user.plan]].day_limit
+        plan_daily_fee = plans[APIPlans[user.plan]].euro_rate
     else:
         plan_daily_limit = None
+        plan_daily_fee = None
 
     # redis key info
 
@@ -161,6 +163,7 @@ async def account_home(
         "ttl_date": ttl_date,
         "ttl": ttl,
         "plan_daily_limit": plan_daily_limit,
+        "plan_daily_fee": plan_daily_fee,
         "net": API_NET,
     }
     return templates.TemplateResponse("account/home.html", context)
@@ -284,7 +287,8 @@ async def set_end_date_for_plan(user: User, mongomotor: MongoMotor):
                 # and the next payment
                 end_date = start_date + dt.timedelta(days=tx.paid_days_for_plan)
 
-    user.plan_end_date = dt.datetime.combine(end_date, dt.time.max).astimezone(dt.UTC)
+    # user.plan_end_date = dt.datetime.combine(end_date, dt.time.max).astimezone(dt.UTC)
+    user.plan_end_date = end_date
     # write back to user
     _ = await mongomotor.utilities[CollectionsUtilities.api_users].bulk_write(
         [

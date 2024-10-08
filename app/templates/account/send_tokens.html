@@ -1,11 +1,7 @@
 {% if user.plan == "free"%}
  
 {% else %}
-  {% if user.payments%}
-  To pay for more days on your API plan,
-  {% else %}
-  In order to register your token transactions,
-  {% endif %}
-  send any amount of EUROe to this address: <br/><br/><code>{{user.alias_account_id}}</code> <br/><br/>
+  To pay for (more) days on your API plan,
+  send  EUROe to this address. <br/>The day rate for your plan is EUROe {{plan_daily_fee|seperator_no_decimals}} / day: <br/><br/><code>{{user.alias_account_id}}</code><br/><br/>
   <p><a href="/" hx-post="/account/refresh" >Refresh</a> the page to see the transaction reflected in your account. </p>
 {% endif %}
