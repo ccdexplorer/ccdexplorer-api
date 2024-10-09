@@ -2,11 +2,13 @@ fastapi[uvicorn]
 fastapi-restful
 uvicorn
 sentry-sdk[fastapi]
-# https://stackoverflow.com/questions/78999040/mongodb-importerror-with-new-pymongo-release
-pymongo==4.8.0
+
+
 typing_inspect
 ccdexplorer-fundamentals
 ccdexplorer_schema_parser
+# https://stackoverflow.com/questions/78999040/mongodb-importerror-with-new-pymongo-release
+pymongo==4.8.0
 grpcio
 grpcio-tools
 grpclib

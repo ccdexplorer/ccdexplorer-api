@@ -12,4 +12,4 @@ COPY ./node_modules/bootstrap/dist/js/bootstrap.bundle.min.js /code/node_modules
 # COPY ./node_modules/plotly.js-dist/plotly.js /code/node_modules/plotly.js-dist/plotly.js
 COPY ./node_modules/htmx.org/dist/htmx.js /code/node_modules/htmx.org/dist/htmx.js
 
-CMD ["uvicorn", "app.main:app",  "--log-level", "info", "--proxy-headers", "--host", "0.0.0.0", "--port", "80"]
+CMD ["uvicorn", "app.main:app",  "--log-level", "warning", "--proxy-headers", "--host", "0.0.0.0", "--port", "80"]
