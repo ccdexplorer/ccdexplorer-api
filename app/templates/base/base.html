@@ -2,7 +2,7 @@
 <html lang="en" data-bs-theme="dark">
   <head>
     <link id="favicon" rel="icon" type="image/x-icon" href="/static/logos/favicon.ico">
-    <script src="/static/js/theme_switcher.js?v={{ range(1, 5000001) | random }}"></script> 
+    <script src="/static/js/theme_switcher.js"></script> 
     <script>const theme=document.querySelector("HTML").getAttribute("data-bs-theme")</script>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -30,10 +30,6 @@
           {% block content %}{% endblock %}
      
     </div>
-      
-
-    
-    
     <script src="/node/htmx.org/dist/htmx.js"></script>
     
   </body>

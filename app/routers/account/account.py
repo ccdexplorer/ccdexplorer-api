@@ -1,14 +1,12 @@
 from uuid import uuid4
-import httpx
 import math
+import httpx
 from ccdexplorer_fundamentals.cis import MongoTypeLoggedEvent, transferEvent
 from ccdexplorer_fundamentals.mongodb import (
     MongoMotor,
     Collections,
     CollectionsUtilities,
-    MongoDB,
 )
-import io
 import datetime as dt
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_BlockItemSummary
 from fastapi import APIRouter, Depends, Request
@@ -21,8 +19,6 @@ from app.models import APIKey, User, APIPayment, APIPlans, plans
 from app.state_getters import (
     get_mongo_motor,
     get_user_details,
-    get_httpx_client,
-    get_mongo_db,
     get_api_keys,
 )
 
@@ -90,7 +86,9 @@ async def get_payment_tx_and_update_payments(
                 )
             ]
         )
-        await set_end_date_for_plan(user, request.app.motormongo)
+        await set_end_date_for_plan(
+            user, request.app.motormongo, request.app.httpx_client
+        )
 
 
 @router.get("/account")
@@ -152,6 +150,7 @@ async def account_home(
     ttl = await request.app.redis.ttl(f"v2:*:{user.api_account_id}:day")
 
     ttl_date = dt.datetime.now().astimezone(dt.UTC) + dt.timedelta(seconds=ttl)
+    ttl_humanize = dt.timedelta(seconds=ttl)
     context = {
         "request": request,
         "env": environment,
@@ -162,6 +161,7 @@ async def account_home(
         "day_calls_remaining": day_calls_remaining,
         "ttl_date": ttl_date,
         "ttl": ttl,
+        "ttl_humanize": ttl_humanize,
         "plan_daily_limit": plan_daily_limit,
         "plan_daily_fee": plan_daily_fee,
         "net": API_NET,
@@ -258,7 +258,9 @@ async def account_delete_key(
     return response
 
 
-async def set_end_date_for_plan(user: User, mongomotor: MongoMotor):
+async def set_end_date_for_plan(
+    user: User, mongomotor: MongoMotor, httpx_client: httpx.AsyncClient
+):
     # 1 get tx hashes from payments
     # 2 get
     if len(user.payments) == 0:
@@ -274,7 +276,17 @@ async def set_end_date_for_plan(user: User, mongomotor: MongoMotor):
         end_date = start_date
 
         for _, tx in sorted_txs:
-            start_date = dateutil.parser.parse(tx.tx_date)
+            try:
+                response = await httpx_client.get(
+                    f"{API_URL}/v2/{API_NET}/transaction/{tx.tx_hash}"
+                )
+                response.raise_for_status()
+                tx_classified = CCD_BlockItemSummary(**response.json())
+            except httpx.HTTPError as e:
+                print(e)
+                return None
+
+            start_date = tx_classified.block_info.slot_time
             if start_date < end_date:
                 # calculate the overlap days
                 days_overlap = (end_date - start_date).total_seconds() / (60 * 60 * 24)

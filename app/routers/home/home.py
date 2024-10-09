@@ -19,10 +19,14 @@ router = APIRouter(include_in_schema=False)
 
 
 @router.get("/")
-async def home_route(request: Request):
+async def home_route(
+    request: Request,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+):
     user: User = get_user_details(request)
-    # if user:
-    #     if not isinstance(user, User):
-    #         user = User(**user)
-    context = {"request": request, "env": environment, "user": user}
+    faqs = [
+        x
+        for x in await mongomotor.utilities_db["api_faq"].find({}).to_list(length=None)
+    ]
+    context = {"request": request, "env": environment, "user": user, "faqs": faqs}
     return templates.TemplateResponse("plans/home.html", context)

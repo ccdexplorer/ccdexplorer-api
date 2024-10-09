@@ -19,7 +19,7 @@
         {% if user.plan != "free" %}
          {% if user.active%}
             <tr class="sm-text">
-                <td class=" text-secondary-emphasis">Plan End Date<br/><small>* End of Day</small></td>
+                <td class=" text-secondary-emphasis">Plan End Date</td>
                 <td class=" text-secondary-emphasis">{% if user.active%}{{user.plan_end_date|datetime_to_date_and_time_no_sec}}{% else %}-{%endif%}</td>
             </tr>
             {%endif%}
@@ -36,7 +36,8 @@
         </tr>
         <tr class="sm-text">
             <td class=" text-secondary-emphasis">API Call Limit Reset</td>
-            <td class=" text-secondary-emphasis">{% if ttl == -2 %}-{% else %}{{ttl_date|datetime_to_date_and_time_no_sec}}{% endif %}</td>
+            <td class=" text-secondary-emphasis">{% if ttl == -2 %}-{% else %}{{ttl_date|datetime_to_date_and_time_no_sec}}<br/><small>({{ttl_humanize|humanize_timedelta}})</small>{% endif %}</td>
+            
         </tr>
         {%endif%}
     </tbody>

@@ -95,6 +95,9 @@ class User(BaseModel):
     api_account_id: str  # uuid
     email: str
     password: str  # hashed
+    reset_password_token: Optional[str] = (
+        None  # gets added if user clicks reset password
+    )
     plan: Optional[str] = None
     payments: Optional[dict[str, APIPayment]] = None
     # this field is generated from the payments array

@@ -39,6 +39,26 @@ async def get_user_by_email(email: str, session) -> Optional[User]:
         return None
 
 
+async def get_user_by_reset_password_token(
+    reset_password_token: str, session
+) -> Optional[User]:
+    """ """
+    if isinstance(session, MongoMotor):
+        motormongo = session
+    else:
+        motormongo = session()
+    db = motormongo.utilities_db
+    result = (
+        await db["api_users"]
+        .find({"reset_password_token": reset_password_token})
+        .to_list(length=1)
+    )
+    if result:
+        return User(**result[0])
+    else:
+        return None
+
+
 @manager.user_loader(session=get_session)
 async def get_user(name: str, session):
     return await get_user_by_email(name, session)
@@ -85,6 +105,127 @@ async def login(
         return templates.TemplateResponse("auth/login.html", context)
     response = RedirectResponse(url="/account", status_code=303)
     manager.set_cookie(response, user.token)
+    return response
+
+
+@router.get("/forgot-password")
+async def forgot_password(
+    request: Request,
+    response: Response,
+    db: MongoMotor = Depends(get_mongo_motor),
+) -> HTMLResponse:
+    """
+    The user has forgotten its password. Ask for email and send a reset email.
+    """
+
+    context = {
+        "request": request,
+        "env": environment,
+    }
+    return templates.TemplateResponse("auth/forgot_password.html", context)
+
+
+@router.get("/reset-password-action/{reset_password_token}")
+async def reset_password_action(
+    request: Request,
+    reset_password_token: str,
+    response: Response,
+    db: MongoMotor = Depends(get_mongo_motor),
+) -> HTMLResponse:
+    """
+    The user has forgotten its password and clicked on the link in the email.
+    """
+    user = await get_user_by_reset_password_token(reset_password_token, db)
+    if not user:
+        response = RedirectResponse(url="/auth/login", status_code=303)
+        return response
+
+    context = {
+        "request": request,
+        "env": environment,
+        "reset_password_token": reset_password_token,
+    }
+    return templates.TemplateResponse("auth/reset_password.html", context)
+
+
+@router.post("/reset-password")
+async def forgot_password_action(
+    request: Request,
+    response: Response,
+    db: MongoMotor = Depends(get_mongo_motor),
+) -> HTMLResponse:
+    """
+    The user has forgotten its password. Ask for email and send a reset email.
+    """
+    username = None
+    body = await request.body()
+    if body:
+        username = body.decode("utf-8").split("=")[1].replace("%40", "@")
+    user = await get_user_by_email(username, db)
+
+    if user:
+        user.reset_password_token = str(uuid4())
+        db.utilities_db["api_users"].bulk_write(
+            [
+                ReplaceOne(
+                    {"_id": user.api_account_id},
+                    user.model_dump(exclude_none=True),
+                    upsert=True,
+                )
+            ]
+        )
+        request.app.tooter.email_api(
+            title="CCDExplorer.io API - Forgot password",
+            body=f"""Someone has clicked the 'Reset Password' link on {API_URL} for your account. If this was you and you need to reset your password, please click <a href='{API_URL}/auth/reset-password-action/{user.reset_password_token}'>Reset Password</a>.
+            If this wasn't you, please ignore this email.""",
+            email_address=user.email,
+        )
+
+    context = {
+        "request": request,
+        "env": environment,
+    }
+    return templates.TemplateResponse("auth/forgot_password_action.html", context)
+
+
+@router.post("/set-password")
+async def set_new_password_after_forgot(
+    request: Request,
+    response: Response,
+    db: MongoMotor = Depends(get_mongo_motor),
+) -> HTMLResponse:
+    """
+    The user has forgotten its password. Asks for email and clicked on the link. Now sets new password.
+    """
+    password = None
+    reset_password_token = None
+    body = await request.body()
+    if body:
+        components = body.decode("utf-8").split("&")
+
+        password = components[0].split("=")[1]
+        reset_password_token = components[1].split("=")[1]
+    user = await get_user_by_reset_password_token(reset_password_token, db)
+
+    if user:
+        user.password = hash_password(password)
+        user.reset_password_token = None
+        db.utilities_db["api_users"].bulk_write(
+            [
+                ReplaceOne(
+                    {"_id": user.api_account_id},
+                    user.model_dump(exclude_none=True),
+                    upsert=True,
+                )
+            ]
+        )
+        request.app.tooter.email_api(
+            title="CCDExplorer.io API - Reset password",
+            body=f"""The password on your account on {API_URL} was just reset. If this wasn't you, please contact me on Telegram (explorer.ccd) at once.""",
+            email_address=user.email,
+        )
+
+    response = RedirectResponse(url="/auth/login", status_code=303)
     return response
 
 
