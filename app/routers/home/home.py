@@ -5,7 +5,7 @@ from ccdexplorer_fundamentals.mongodb import (
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from app.ENV import API_KEY_HEADER, environment
 from fastapi.responses import JSONResponse, HTMLResponse
-from app.models import User
+from app.models import User, plans_for_display
 
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -28,5 +28,11 @@ async def home_route(
         x
         for x in await mongomotor.utilities_db["api_faq"].find({}).to_list(length=None)
     ]
-    context = {"request": request, "env": environment, "user": user, "faqs": faqs}
+    context = {
+        "request": request,
+        "env": environment,
+        "user": user,
+        "faqs": faqs,
+        "plans_for_display": plans_for_display,
+    }
     return templates.TemplateResponse("plans/home.html", context)

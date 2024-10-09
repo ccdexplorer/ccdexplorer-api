@@ -108,8 +108,9 @@ async def account_home(
         if API_NET == "testnet"
         else request.app.motormongo.mainnet
     )
-    token_address = "<7260,0>-" if API_NET == "testnet" else "<9390,0>-"
+
     euroe_tag = await db_to_use[Collections.tokens_tags].find_one({"_id": "EUROe"})
+    token_address = f'{euroe_tag["contracts"][0]}-'
 
     _ = await get_payment_tx_and_update_payments(
         request, user, db_to_use, euroe_tag, token_address

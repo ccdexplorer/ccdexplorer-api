@@ -1,8 +1,5 @@
 
 <h4  class="sm-text">Summary</h4>
-{% if not user.plan %}
-  <p>You first need to select a plan before you can request an API key. Go to <a href="/plans">plans</a> to learn more.</p>
-{% else %}
   <table class="table table-borderless" >
     <thead></thead>
     <tbody>
@@ -10,10 +7,14 @@
             <td class=" text-secondary-emphasis">Username</td>
             <td class=" text-secondary-emphasis">{{user.email}}</td>
         </tr>
+        {% if not user.plan %}
+  <tr><td class=" text-secondary-emphasis" colspan="2">You first need to select a plan before you can request an API key. Go to <a href="/">plans</a> to learn more.</td></tr>
+{% else %}
+
         <tr class="sm-text">
             <td class=" text-secondary-emphasis">Plan</td>
             <td class=" text-secondary-emphasis">{{user.plan.capitalize()}}
-                {% if user.plan == "free" %} (<a href="/" hx-post="/plans/reset" >Upgrade</a>){% endif %}
+                {% if user.plan == "free" %} (<a href="/" hx-post="/plans/reset" >Upgrade</a>){% else %}{% if (user.payments|length == 0) %}  (<a href="/" hx-post="/plans/reset" >Change</a>){% endif %} {% endif %}
             </td>
         </tr>
         {% if user.plan != "free" %}
@@ -40,7 +41,7 @@
             
         </tr>
         {%endif%}
+        {% endif %}
     </tbody>
 
 </table>
-{% endif %}

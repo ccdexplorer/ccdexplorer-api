@@ -7,7 +7,7 @@ from ccdexplorer_fundamentals.mongodb import (
 )
 from app.ENV import environment
 from app.jinja2_helpers import templates
-from app.models import User
+from app.models import User, plans_for_display
 from app.state_getters import get_user_details
 import datetime as dt
 
@@ -95,6 +95,5 @@ async def plans_reset_plan(
 
 @router.get("/plans")
 async def key_plans_home(request: Request):
-    user: User = get_user_details(request)
-    context = {"request": request, "user": user, "env": environment}
-    return templates.TemplateResponse("plans/home.html", context)
+    response = RedirectResponse(url="/", status_code=303)
+    return response

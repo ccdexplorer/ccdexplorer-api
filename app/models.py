@@ -39,14 +39,14 @@ plans.update(
             plan_name=APIPlans.standard.value,
             euro_rate=1,
             day_limit=10_000,
-            sec_limit=2,
+            sec_limit=5,
         )
     }
 )
 plans.update(
     {
         APIPlans.pro: APIPlansDetail(
-            plan_name=APIPlans.pro.value, euro_rate=3, day_limit=100_000, sec_limit=2
+            plan_name=APIPlans.pro.value, euro_rate=3, day_limit=100_000, sec_limit=5
         )
     }
 )
@@ -59,6 +59,7 @@ plans.update(
 )
 
 rate_limit_rules = []
+plans_for_display = {}
 for plan, detail in plans.items():
     day = detail.day_limit if detail.day_limit else None
     min = detail.min_limit if detail.min_limit else None
@@ -68,6 +69,23 @@ for plan, detail in plans.items():
     rate_limit_rules.append(
         Rule(day=day, minute=min, second=sec, group=group, zone=zone)
     )
+
+    # for display
+    if group == "free":
+        plans_for_display[group] = {
+            "price": "EUROe 0",
+            "server_limit": f"{min} API calls/minute limit",
+            "day_limit": f"Up to {day:,.0f} API calls/day",
+            "note": "*Link back to the api is required",
+        }
+    if group in ["standard", "pro"]:
+        plans_for_display[group] = {
+            "price": f"EUROe {detail.euro_rate:,.0f} / day",
+            "server_limit": f"{sec} API calls/second limit",
+            "day_limit": f"Up to {day:,.0f} API calls/day",
+        }
+
+
 rate_limit_rules.append(Rule(group="ccdexplorer.io"))
 
 

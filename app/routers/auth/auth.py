@@ -284,7 +284,8 @@ async def register(
                 )
             ]
         )
-        response = RedirectResponse(url="/auth/login", status_code=303)
+        response = RedirectResponse(url="/account", status_code=303)
+        manager.set_cookie(response, user.token)
         return response
 
     else:
