@@ -4,13 +4,15 @@ import datetime as dt
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from functools import lru_cache
+
 import httpx
 import requests
 import urllib3
 from ccdexplorer_fundamentals.enums import NET
 from ccdexplorer_fundamentals.mongodb import MongoDB, MongoMotor
-from fastapi import FastAPI, HTTPException, Security
+from fastapi import FastAPI, HTTPException, Response, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
@@ -25,10 +27,11 @@ urllib3.disable_warnings()
 
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
 from ccdexplorer_fundamentals.tooter import Tooter
+
 from app.ENV import *
 from app.models import rate_limit_rules
-from app.routers.auth import auth
 from app.routers.account import account
+from app.routers.auth import auth
 from app.routers.home import home
 from app.routers.plans import plans
 
@@ -62,11 +65,12 @@ from typing import Tuple
 from ratelimit import RateLimitMiddleware, Rule
 from ratelimit.auths import EmptyInformation
 from ratelimit.auths.session import from_session
-from ratelimit.backends.simple import MemoryBackend
-from redis.asyncio import StrictRedis
-from ratelimit.backends.slidingredis import SlidingRedisBackend
 from ratelimit.backends.redis import RedisBackend
+from ratelimit.backends.simple import MemoryBackend
+from ratelimit.backends.slidingredis import SlidingRedisBackend
 from ratelimit.types import ASGIApp, Receive, Scope, Send
+from redis.asyncio import StrictRedis
+
 from app.ratelimiting import AUTH_FUNCTION, handle_429, handle_auth_error
 
 
@@ -113,12 +117,13 @@ tags_metadata = [
 
 app = FastAPI(
     lifespan=lifespan,
+    # docs_url=None,
     swagger_ui_parameters={"syntaxHighlight.theme": "obsidian"},
     openapi_tags=tags_metadata,
     separate_input_output_schemas=False,
     title="CCDExplorer.io API",
     summary="The API service for CCDExplorer.io.",
-    version="0.0.2",
+    version="1.0.0",
     contact={
         "name": "explorer.ccd on Telegram",
     },
@@ -181,3 +186,13 @@ app.include_router(auth.router)
 app.include_router(home.router)
 app.include_router(account.router)
 app.include_router(plans.router)
+
+
+# @app.get("/docs", include_in_schema=False)
+# async def custom_swagger_ui_html_cdn():
+#     return get_swagger_ui_html(
+#         openapi_url=app.openapi_url,
+#         title=f"{app.title} - Swagger UI",
+#         # swagger_ui_dark.css CDN link
+#         swagger_css_url="https://cdn.jsdelivr.net/gh/Itz-fork/Fastapi-Swagger-UI-Dark/assets/swagger_ui_dark.min.css",
+#     )
