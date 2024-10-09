@@ -88,8 +88,8 @@ async def plans_reset_plan(
                 [DeleteOne({"_id": x["_id"]})]
             )
 
-    response = RedirectResponse(url="/account", status_code=200)
-    response.headers["HX-Redirect"] = "/account"
+    response = RedirectResponse(url="/", status_code=200)
+    response.headers["HX-Redirect"] = "/"
     return response
 
 
