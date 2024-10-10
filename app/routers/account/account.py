@@ -115,6 +115,8 @@ async def account_home(
     _ = await get_payment_tx_and_update_payments(
         request, user, db_to_use, euroe_tag, token_address
     )
+    # read user again back from updated db
+    user: User = get_user_details(request)
 
     total_paid_amount = [payment.amount_euroe for payment in user.payments.values()]
 
@@ -136,6 +138,9 @@ async def account_home(
         plan_daily_limit = None
         plan_daily_fee = None
 
+    if user.plan == "free":
+        plan_min_limit = plans[APIPlans[user.plan]].min_limit
+
     # redis key info
 
     # for sliding_window use these
@@ -148,10 +153,26 @@ async def account_home(
         day_calls_remaining = day_calls_remaining.decode()
     else:
         day_calls_remaining = plan_daily_limit
-    ttl = await request.app.redis.ttl(f"v2:*:{user.api_account_id}:day")
 
+    ttl = await request.app.redis.ttl(f"v2:*:{user.api_account_id}:day")
     ttl_date = dt.datetime.now().astimezone(dt.UTC) + dt.timedelta(seconds=ttl)
     ttl_humanize = dt.timedelta(seconds=ttl)
+
+    if user.plan == "free":
+        ttl_min = await request.app.redis.ttl(f"v2:*:{user.api_account_id}:minute")
+        ttl_date_min = dt.datetime.now().astimezone(dt.UTC) + dt.timedelta(
+            seconds=ttl_min
+        )
+        ttl_humanize_min = dt.timedelta(seconds=ttl_min)
+
+        min_calls_remaining = await request.app.redis.get(
+            f"v2:*:{user.api_account_id}:minute"
+        )
+        if min_calls_remaining:
+            min_calls_remaining = min_calls_remaining.decode()
+        else:
+            min_calls_remaining = plan_min_limit
+
     context = {
         "request": request,
         "env": environment,
@@ -160,10 +181,15 @@ async def account_home(
         "sample_key": sample_key,
         "total_paid_amount": total_paid_amount,
         "day_calls_remaining": day_calls_remaining,
+        "min_calls_remaining": min_calls_remaining,
         "ttl_date": ttl_date,
         "ttl": ttl,
+        "ttl_min": ttl_min,
+        "ttl_date_min": ttl_date_min,
+        "ttl_humanize_min": ttl_humanize_min,
         "ttl_humanize": ttl_humanize,
         "plan_daily_limit": plan_daily_limit,
+        "plan_min_limit": plan_min_limit,
         "plan_daily_fee": plan_daily_fee,
         "net": API_NET,
     }

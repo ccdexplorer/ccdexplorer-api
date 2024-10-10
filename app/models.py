@@ -30,6 +30,7 @@ plans.update(
             euro_rate=0.0000001,
             day_limit=100,
             min_limit=2,
+            block_time=0,
         )
     }
 )

@@ -156,6 +156,7 @@ app.add_middleware(
 app.add_middleware(
     RateLimitMiddleware,
     authenticate=AUTH_FUNCTION,
+    # if ever the plan to go to a sliding window technique, use this.
     # backend=SlidingRedisBackend(StrictRedis.from_url(REDIS_URL)),
     backend=RedisBackend(StrictRedis.from_url(REDIS_URL)),
     on_auth_error=handle_auth_error,

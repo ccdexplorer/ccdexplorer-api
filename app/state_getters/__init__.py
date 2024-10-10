@@ -10,13 +10,13 @@ async def get_httpx_client(req: Request):
 
 
 def get_and_save_user_from_collection(req: Request):
-    if (
-        dt.datetime.now().astimezone(dt.timezone.utc) - req.app.users_last_requested
-    ).total_seconds() > 5:
+    # if (
+    #     dt.datetime.now().astimezone(dt.timezone.utc) - req.app.users_last_requested
+    # ).total_seconds() > 5:
 
-        result = req.app.mongodb.utilities_db["api_users"].find({})
-        req.app.users_from_collection = {x["token"]: User(**x) for x in list(result)}
-        req.app.users_last_requested = dt.datetime.now().astimezone(dt.timezone.utc)
+    result = req.app.mongodb.utilities_db["api_users"].find({})
+    req.app.users_from_collection = {x["token"]: User(**x) for x in list(result)}
+    req.app.users_last_requested = dt.datetime.now().astimezone(dt.timezone.utc)
 
 
 def get_user_details(req: Request, token: str = None) -> User | None:
