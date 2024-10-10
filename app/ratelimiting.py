@@ -13,9 +13,7 @@ async def handle_auth_error(exc: Exception) -> ASGIApp:
 
 def handle_429(retry_after: int):
     async def inside_yourself_429(scope: Scope, receive: Receive, send: Send) -> None:
-        body = json.dumps(
-            {"message": f"Too many requests. Retry after {retry_after:,.0f} seconds."}
-        ).encode("utf8")
+        body = json.dumps({"message": "Too many requests."}).encode("utf8")
         headers = [
             (b"content-length", str(len(body)).encode("utf8")),
             (b"content-type", b"application/json"),
