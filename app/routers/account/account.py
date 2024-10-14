@@ -172,6 +172,12 @@ async def account_home(
             min_calls_remaining = min_calls_remaining.decode()
         else:
             min_calls_remaining = plan_min_limit
+    else:
+        min_calls_remaining = None
+        ttl_min = None
+        ttl_date_min = None
+        ttl_humanize_min = None
+        plan_min_limit = None
 
     context = {
         "request": request,

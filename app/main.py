@@ -89,9 +89,7 @@ async def lifespan(app: FastAPI):
     init_time = dt.datetime.now().astimezone(dt.timezone.utc) - timedelta(seconds=10)
     app.users_last_requested = init_time
     app.api_keys = await get_api_keys(motormongo=motormongo, app=app)
-    print(f"MAIN: {app.api_keys}")
     yield
-    # Any cleanup should happen here
     pass
 
 
