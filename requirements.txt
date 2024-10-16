@@ -8,7 +8,7 @@ typing_inspect
 ccdexplorer-fundamentals
 ccdexplorer_schema_parser
 # https://stackoverflow.com/questions/78999040/mongodb-importerror-with-new-pymongo-release
-pymongo==4.8.0
+
 grpcio
 grpcio-tools
 grpclib
@@ -25,3 +25,4 @@ passlib
 bcrypt==4.0.1
 python-dotenv
 humanize
+pymongo==4.8.0
