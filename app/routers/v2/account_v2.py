@@ -7,11 +7,15 @@ from ccdexplorer_fundamentals.GRPCClient.CCD_Types import (
     CCD_PoolInfo,
     CCD_BlockItemSummary,
 )
+import dateutil
+from typing import Optional
 from ccdexplorer_fundamentals.mongodb import (
     Collections,
     MongoMotor,
     MongoDB,
     MongoTypePayday,
+    MongoTypeBlockPerDay,
+    MongoImpactedAddress,
 )
 from ccdexplorer_fundamentals.tooter import Tooter, TooterChannel, TooterType  # noqa
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
@@ -19,8 +23,15 @@ from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import datetime as dt
+import math
 from pymongo import DESCENDING, ASCENDING
-from app.state_getters import get_grpcclient, get_mongo_db, get_mongo_motor
+from app.state_getters import (
+    get_grpcclient,
+    get_mongo_db,
+    get_mongo_motor,
+    get_exchange_rates,
+    get_blocks_per_day,
+)
 
 
 class TokenHolding(BaseModel):
@@ -28,9 +39,42 @@ class TokenHolding(BaseModel):
     contract: str
     token_id: str
     token_amount: str
+    decimals: Optional[int] = None
+    token_symbol: Optional[str] = None
+    token_value: Optional[float] = None
+    token_value_USD: Optional[float] = None
 
 
 router = APIRouter(tags=["Account"], prefix="/v2")
+
+
+async def convert_account_fungible_tokens_value_to_USD(
+    tokens_dict: dict[str, TokenHolding], db_to_use, exchange_rates
+):
+    tokens_tags = {
+        x["contracts"][0]: x
+        for x in db_to_use[Collections.tokens_tags].find({"token_type": "fungible"})
+    }
+
+    tokens_with_metadata: dict[str, TokenHolding] = {}
+    for contract, d in tokens_dict.items():
+        if contract in tokens_tags.keys():
+            # it's a single use contract
+            d.decimals = tokens_tags[contract]["decimals"]
+            d.token_symbol = tokens_tags[contract]["get_price_from"]
+            d.token_value = int(d.token_amount) * (math.pow(10, -d.decimals))
+
+            if d.token_symbol in exchange_rates:
+                d.token_value_USD = (
+                    d.token_value * exchange_rates[d.token_symbol]["rate"]
+                )
+
+            else:
+                d.token_value_USD = 0
+            tokens_with_metadata[contract] = d
+
+    tokens_value_USD = sum([x.token_value_USD for x in tokens_with_metadata.values()])
+    return tokens_value_USD
 
 
 @router.get(
@@ -68,6 +112,131 @@ async def get_account_tokens_received(
         raise HTTPException(
             status_code=404,
             detail=f"Requested account ({account_address}) has not received tokens from contract <{contract_index},{contract_subindex}> on {net}",
+        )
+
+
+@router.get(
+    "/{net}/account/{account_address}/tokens-available", response_class=JSONResponse
+)
+async def get_account_tokens_available(
+    request: Request,
+    net: str,
+    account_address: str,
+    mongodb: MongoDB = Depends(get_mongo_db),
+    api_key: str = Security(API_KEY_HEADER),
+) -> bool:
+    """
+    Endpoint to determine if a given account holds tokens, as stored in MongoDB collection `tokens_links_v2`.
+
+
+    """
+    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    result_list = list(
+        db_to_use[Collections.tokens_links_v2]
+        .find({"account_address_canonical": account_address[:29]})
+        .limit(1)
+    )
+    tokens = [TokenHolding(**x["token_holding"]) for x in result_list]
+
+    return len(tokens) > 0
+
+
+@router.get(
+    "/{net}/account/{account_address}/fungible-tokens/USD", response_class=JSONResponse
+)
+async def get_account_fungible_tokens_value_in_USD(
+    request: Request,
+    net: str,
+    account_address: str,
+    mongodb: MongoDB = Depends(get_mongo_db),
+    exchange_rates: dict = Depends(get_exchange_rates),
+    api_key: str = Security(API_KEY_HEADER),
+) -> float:
+    """
+    Endpoint to get sum of all fungible tokens in USD for a given account, as stored in MongoDB collection `tokens_links_v2`.
+
+
+    """
+    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    result_list = list(
+        db_to_use[Collections.tokens_links_v2].find(
+            {"account_address_canonical": account_address[:29]}
+        )
+    )
+    tokens = [TokenHolding(**x["token_holding"]) for x in result_list]
+
+    if len(tokens) > 0:
+        tokens_value_USD = await convert_account_fungible_tokens_value_to_USD(
+            {x.contract: x for x in tokens},
+            db_to_use,
+            exchange_rates,
+        )
+        return tokens_value_USD
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested account ({account_address}) has no tokens on {net}",
+        )
+
+
+@router.get(
+    "/{net}/account/{account_address}/token-symbols-for-flow",
+    response_class=JSONResponse,
+)
+async def get_account_token_symbols_for_flow(
+    request: Request,
+    net: str,
+    account_address: str,
+    mongodb: MongoDB = Depends(get_mongo_db),
+    api_key: str = Security(API_KEY_HEADER),
+) -> list[str]:
+    """
+    Endpoint to get all tokens for a given account, even if the current balance is zero.
+
+
+    """
+    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    pipeline = [
+        {
+            "$match": {
+                "$or": [
+                    {"result.to_address": account_address},
+                    {"result.from_address": account_address},
+                ]
+            }
+        },
+        {
+            "$group": {
+                "_id": "$contract",
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "contract": "$_id",
+            }
+        },
+    ]
+    contracts = list(db_to_use[Collections.tokens_logged_events].aggregate(pipeline))
+    if len(contracts) > 0:
+        contracts_for_account = [x["contract"] for x in contracts]
+        tokens_tags_contracts = {
+            x["contracts"][0]: x
+            for x in db_to_use[Collections.tokens_tags].find(
+                {"token_type": "fungible"}, {"_id": 1, "contracts": 1}
+            )
+        }
+        return sorted(
+            [
+                value["_id"]
+                for key, value in tokens_tags_contracts.items()
+                if key in contracts_for_account
+            ]
+        )
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested account ({account_address}) has no tokens on {net}",
         )
 
 
@@ -133,6 +302,36 @@ async def get_account_balance_at_block(
         )
 
 
+@router.get("/{net}/account/{account_address}/balance/USD", response_class=JSONResponse)
+async def get_account_balance_in_USD(
+    request: Request,
+    net: str,
+    account_address: str,
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    exchange_rates: dict = Depends(get_exchange_rates),
+    api_key: str = Security(API_KEY_HEADER),
+) -> float:
+    """
+    Endpoint to get all CCD balance in microCCD converted to USD for a given account at the last final block.
+
+
+    """
+    try:
+        result = grpcclient.get_account_info(
+            "last_final", account_address, net=NET(net)
+        )
+    except grpc._channel._InactiveRpcError:
+        result = None
+
+    if result:
+        return (result.amount / 1_000_000) * exchange_rates["CCD"]["rate"]
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested account {account_address} not found on {net}",
+        )
+
+
 @router.get("/{net}/account/{account_address}/balance", response_class=JSONResponse)
 async def get_account_balance(
     request: Request,
@@ -168,6 +367,7 @@ async def get_account_info(
     net: str,
     index_or_hash: int | str,
     grpcclient: GRPCClient = Depends(get_grpcclient),
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_AccountInfo:
     """
@@ -190,6 +390,19 @@ async def get_account_info(
             except grpc._channel._InactiveRpcError:
                 result = None
         else:
+            if len(index_or_hash) == 29:
+                try:
+                    db_to_use = (
+                        mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+                    )
+                    result = await db_to_use[
+                        Collections.all_account_addresses
+                    ].find_one({"_id": index_or_hash})
+                    if result:
+                        index_or_hash = result["account_address"]
+                except Exception:
+                    index_or_hash = ""
+
             try:
                 result = grpcclient.get_account_info(
                     "last_final", hex_address=index_or_hash, net=NET(net)
@@ -581,6 +794,32 @@ async def get_account_apy_data(
         )
 
 
+@router.get("/{net}/account/{index}/node", response_class=JSONResponse)
+async def get_account_validator_node(
+    request: Request,
+    net: str,
+    index: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """
+    Endpoint to get account validator node.
+
+
+    """
+    db_to_use = mongomotor.mainnet
+    try:
+        result = await db_to_use[Collections.dashboard_nodes].find_one(
+            {"consensusBakerId": str(index)}
+        )
+        return result
+    except Exception as error:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Can't retrieve account APY data with error {error}.",
+        )
+
+
 @router.get(
     "/{net}/account/{index_or_hash}/staking-rewards-object", response_class=JSONResponse
 )
@@ -751,7 +990,7 @@ async def get_account_validator_txs(
                         {"effect_type": "baker_removed"},
                         {"effect_type": "baker_stake_updated"},
                         {"effect_type": "baker_restake_earnings_updated"},
-                        {"effect_type": "baker_keys_updated"},
+                        # {"effect_type": "baker_keys_updated"},
                         {"effect_type": "baker_configured"},
                     ]
                 },
@@ -794,4 +1033,236 @@ async def get_account_validator_txs(
         raise HTTPException(
             status_code=404,
             detail=f"Can't retrieve validator transactions for account at {account_id} on {net} with error {error}.",
+        )
+
+
+@router.get(
+    "/{net}/account/{account_id}/transactions-for-flow/{gte}/{start_date}/{end_date}",
+    response_class=JSONResponse,
+)
+async def get_account_transactions_for_flow_graph(
+    request: Request,
+    net: str,
+    account_id: str,
+    gte: str,
+    start_date: str,
+    end_date: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    blocks_per_day: dict[str, MongoTypeBlockPerDay] = Depends(get_blocks_per_day),
+    api_key: str = Security(API_KEY_HEADER),
+) -> list[MongoImpactedAddress]:
+    """
+    Endpoint to get all txs for a given account that should be included in the flow graph for CCD.
+    """
+    amended_start_date = (
+        f"{(dateutil.parser.parse(start_date)-dt.timedelta(days=1)):%Y-%m-%d}"
+    )
+    start_block = blocks_per_day.get(amended_start_date)
+    if start_block:
+        start_block = start_block.height_for_first_block
+    else:
+        start_block = 0
+
+    end_block = blocks_per_day.get(end_date)
+    if end_block:
+        end_block = end_block.height_for_last_block
+    else:
+        end_block = 1_000_000_000
+
+    try:
+        gte = int(gte.replace(",", "").replace(".", ""))
+    except:  # noqa: E722
+        error = True
+
+    db_to_use = mongomotor.mainnet
+    try:
+        pipeline = [
+            {
+                "$match": {"included_in_flow": True},
+            },
+            {"$match": {"block_height": {"$gt": start_block, "$lte": end_block}}},
+            {
+                "$match": {"impacted_address_canonical": {"$eq": account_id[:29]}},
+            },
+        ]
+        txs_for_account = (
+            await db_to_use[Collections.impacted_addresses]
+            .aggregate(pipeline)
+            .to_list(length=None)
+        )
+        return txs_for_account
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Can't determine whether account {account_id} on {net}  has rewards with error {error}.",
+        )
+
+
+@router.get(
+    "/{net}/account/{account_id}/token-transactions-for-flow/{token_id}/{gte}/{start_date}/{end_date}",
+    response_class=JSONResponse,
+)
+async def get_account_token_transactions_for_flow_graph(
+    request: Request,
+    net: str,
+    account_id: str,
+    token_id: str,
+    gte: str,
+    start_date: str,
+    end_date: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    blocks_per_day: dict[str, MongoTypeBlockPerDay] = Depends(get_blocks_per_day),
+    api_key: str = Security(API_KEY_HEADER),
+) -> list[MongoTypeLoggedEvent]:
+    """
+    Endpoint to get all token txs for a given account that should be included in the flow graph for CCD.
+    """
+    amended_start_date = (
+        f"{(dateutil.parser.parse(start_date)-dt.timedelta(days=1)):%Y-%m-%d}"
+    )
+    start_block = blocks_per_day.get(amended_start_date)
+    if start_block:
+        start_block = start_block.height_for_first_block
+    else:
+        start_block = 0
+
+    end_block = blocks_per_day.get(end_date)
+    if end_block:
+        end_block = end_block.height_for_last_block
+    else:
+        end_block = 1_000_000_000
+
+    try:
+        gte = int(gte.replace(",", "").replace(".", ""))
+    except:  # noqa: E722
+        error = True
+
+    db_to_use = mongomotor.mainnet
+    try:
+        pipeline = [
+            {
+                "$match": {
+                    "$or": [
+                        {"result.to_address": account_id},
+                        {"result.from_address": account_id},
+                    ]
+                }
+            },
+            {"$match": {"block_height": {"$gt": start_block, "$lte": end_block}}},
+            {"$match": {"token_address": token_id}},
+        ]
+        txs_for_account = [
+            MongoTypeLoggedEvent(**x)
+            for x in await db_to_use[Collections.tokens_logged_events]
+            .aggregate(pipeline)
+            .to_list(length=None)
+        ]
+        return txs_for_account
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Can't determine whether account {account_id} on {net}  has token txs with error {error}.",
+        )
+
+
+@router.get(
+    "/{net}/account/{account_id}/rewards-for-flow/{start_date}/{end_date}",
+    response_class=JSONResponse,
+)
+async def get_account_rewards_for_flow_graph(
+    request: Request,
+    net: str,
+    account_id: str,
+    start_date: str,
+    end_date: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    blocks_per_day: dict[str, MongoTypeBlockPerDay] = Depends(get_blocks_per_day),
+    api_key: str = Security(API_KEY_HEADER),
+) -> int:
+    """
+    Endpoint to get all rewards for a given account that should be included in the flow graph for CCD.
+    """
+    amended_start_date = (
+        f"{(dateutil.parser.parse(start_date)-dt.timedelta(days=1)):%Y-%m-%d}"
+    )
+    start_block = blocks_per_day.get(amended_start_date)
+    if start_block:
+        start_block = start_block.height_for_first_block
+    else:
+        start_block = 0
+
+    end_block = blocks_per_day.get(end_date)
+    if end_block:
+        end_block = end_block.height_for_last_block
+    else:
+        end_block = 1_000_000_000
+
+    db_to_use = mongomotor.mainnet
+    try:
+        pipeline = [
+            {
+                "$match": {"impacted_address_canonical": {"$eq": account_id[:29]}},
+            },
+            {"$match": {"block_height": {"$gte": start_block, "$lte": end_block}}},
+            {"$match": {"effect_type": "Account Reward"}},
+            {
+                "$group": {
+                    "_id": "$impacted_address",
+                    "sum_finalization_reward": {
+                        "$sum": "$balance_movement.finalization_reward",
+                    },
+                    "sum_baker_reward": {
+                        "$sum": "$balance_movement.baker_reward",
+                    },
+                    "sum_transaction_fee_reward": {
+                        "$sum": "$balance_movement.transaction_fee_reward",
+                    },
+                },
+            },
+        ]
+        rewards_for_account = (
+            await db_to_use[Collections.impacted_addresses]
+            .aggregate(pipeline)
+            .to_list(length=None)
+        )
+        if len(rewards_for_account) > 0:
+            rewards_for_account = rewards_for_account[0]
+        else:
+            rewards_for_account = {
+                "sum_transaction_fee_reward": 0,
+                "sum_baker_reward": 0,
+                "sum_finalization_reward": 0,
+            }
+
+        account_rewards_pre_payday = await db_to_use[
+            Collections.impacted_addresses_pre_payday
+        ].find_one({"impacted_address_canonical": {"$eq": account_id[:29]}})
+        if account_rewards_pre_payday:
+            account_rewards_total = account_rewards_pre_payday[
+                "sum_transaction_fee_reward"
+            ]
+            +account_rewards_pre_payday["sum_baker_reward"]
+            +account_rewards_pre_payday["sum_finalization_reward"]
+            rewards_for_account["sum_transaction_fee_reward"]
+            +rewards_for_account["sum_baker_reward"]
+            +rewards_for_account["sum_finalization_reward"]
+
+        else:
+            if len(rewards_for_account) > 0:
+                account_rewards_total = (
+                    rewards_for_account["sum_transaction_fee_reward"]
+                    + rewards_for_account["sum_baker_reward"]
+                    + rewards_for_account["sum_finalization_reward"]
+                )
+            else:
+                account_rewards_total = 0
+
+        return account_rewards_total
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Can't determine whether account {account_id} on {net}  has rewards with error {error}.",
         )

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, Depends, HTTPException, Security
 from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse, RedirectResponse
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
-from ccdexplorer_fundamentals.cis import CIS
+from ccdexplorer_fundamentals.cis import CIS, MongoTypeTokensTag
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_ContractAddress
 from ccdexplorer_fundamentals.enums import NET
 from ccdexplorer_fundamentals.mongodb import (
@@ -128,6 +128,34 @@ async def get_info_for_token_address(
         raise HTTPException(
             status_code=404,
             detail=f"Requested token_id {token_id} from contract <{contract_index},{contract_subindex}> is not found on {net}.",
+        )
+
+
+@router.get(
+    "/{net}/token/{tag}/info",
+    response_class=JSONResponse,
+)
+async def get_info_for_token_tag(
+    request: Request,
+    net: str,
+    tag: str,
+    mongodb: MongoDB = Depends(get_mongo_db),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
+) -> MongoTypeTokensTag:
+    """
+    Endpoint to get information for a given token tag.
+    """
+    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    token_tag = MongoTypeTokensTag(
+        **db_to_use[Collections.tokens_tags].find_one({"_id": tag})
+    )
+    if token_tag:
+        return token_tag
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested token_tag {tag} is not found on {net}.",
         )
 
 

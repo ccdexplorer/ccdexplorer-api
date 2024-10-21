@@ -3,7 +3,7 @@ from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
 from ccdexplorer_fundamentals.tooter import Tooter, TooterType, TooterChannel  # noqa
 from ccdexplorer_fundamentals.mongodb import (
-    MongoDB,
+    MongoMotor,
     Collections,
 )
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_BlockInfo
@@ -18,7 +18,7 @@ async def get_last_blocks(
     request: Request,
     net: str,
     count: int,
-    mongomotor: MongoDB = Depends(get_mongo_motor),
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[CCD_BlockInfo]:
     """

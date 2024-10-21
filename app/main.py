@@ -35,9 +35,6 @@ from app.routers.auth import auth
 from app.routers.home import home
 from app.routers.plans import plans
 
-# V1
-from app.routers.v1 import block_v1
-
 # # V2
 from app.routers.v2 import (
     account_v2,
@@ -51,6 +48,7 @@ from app.routers.v2 import (
     tokens_v2,
     transaction_v2,
     transactions_v2,
+    module_v2,
 )
 
 grpcclient = GRPCClient()
@@ -88,7 +86,12 @@ async def lifespan(app: FastAPI):
     app.motormongo = motormongo
     init_time = dt.datetime.now().astimezone(dt.timezone.utc) - timedelta(seconds=10)
     app.users_last_requested = init_time
+    app.exchange_rates_last_requested = init_time
+    app.blocks_per_day_last_requested = init_time
     app.api_keys = await get_api_keys(motormongo=motormongo, app=app)
+    app.exchange_rates = None
+    app.blocks_per_day = None
+
     yield
     pass
 
@@ -164,8 +167,6 @@ app.add_middleware(
 
 instrumentator = Instrumentator().instrument(app)
 instrumentator.expose(app)
-# # V1
-app.include_router(block_v1.router)
 
 # # V2
 app.include_router(account_v2.router)
@@ -179,6 +180,7 @@ app.include_router(blocks_v2.router)
 app.include_router(markets_v2.router)
 app.include_router(contract_v2.router)
 app.include_router(misc_v2.router)
+app.include_router(module_v2.router)
 
 # auth, content, key management
 app.include_router(auth.router)

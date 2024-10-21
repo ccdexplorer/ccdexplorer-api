@@ -5,7 +5,7 @@ from ccdexplorer_fundamentals.mongodb import (
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
-
+import json
 from app.state_getters import get_mongo_motor
 
 router = APIRouter(tags=["Accounts"], prefix="/v2")
@@ -44,3 +44,74 @@ async def get_accounts_count_estimate(
             status_code=404,
             detail=f"Error retrieving accounts count on {net}, {error}.",
         )
+
+
+@router.post("/{net}/accounts/get-indexes", response_class=JSONResponse)
+async def get_account_indexes(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """
+    Endpoint to get the the account_indexes for a list of canonical account_ids.
+
+    """
+    body = await request.body()
+    if body:
+        account_ids = json.loads(body.decode("utf-8"))
+
+    else:
+        account_ids = []
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    try:
+        result = (
+            await db_to_use[Collections.all_account_addresses]
+            .find({"_id": {"$in": account_ids}})
+            .to_list(length=None)
+        )
+        error = None
+    except Exception as error:
+        print(error)
+        result = None
+
+    if result:
+        return {x["_id"]: x["account_index"] for x in result}
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Error retrieving accounts list on {net}, {error}.",
+        )
+
+
+# @router.get("/{net}/accounts/search/{search_value}", response_class=JSONResponse)
+# async def get_accounts_from_regex_search(
+#     request: Request,
+#     net: str,
+#     search_value: str,
+#     mongomotor: MongoMotor = Depends(get_mongo_motor),
+#     api_key: str = Security(API_KEY_HEADER),
+# ) -> dict:
+#     """
+#     Endpoint to get accounts searching using regex.
+
+#     """
+#     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+#     try:
+#         result = (
+#             await db_to_use[Collections.all_account_addresses]
+#             .find({"_id": {"$regex": f"{search_value}"}})
+#             .to_list(length=None)
+#         )
+#         error = None
+#     except Exception as error:
+#         print(error)
+#         result = None
+
+#     if result:
+#         return {x["_id"]: x["account_index"] for x in result}
+#     else:
+#         raise HTTPException(
+#             status_code=404,
+#             detail=f"Error retrieving accounts via regex on {net} for term {search_value}, {error}.",
+#         )

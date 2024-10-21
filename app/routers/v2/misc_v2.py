@@ -253,3 +253,28 @@ async def get_nodes_count(
             status_code=404,
             detail="Error requesting nodes for {net}.",
         )
+
+
+@router.get(
+    "/{net}/misc/node/{node_id}",
+    response_class=JSONResponse,
+)
+async def get_node_info(
+    request: Request,
+    net: str,
+    node_id: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+    """
+    Endpoint to get node information for a given node id.
+    """
+    db_to_use = mongomotor.mainnet
+    result = await db_to_use[Collections.dashboard_nodes].find_one({"_id": node_id})
+    if result:
+        return result
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail="Error requesting nodes for {net}.",
+        )

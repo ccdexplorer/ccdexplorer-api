@@ -2,6 +2,11 @@ from fastapi import Request
 from app.ENV import API_URL
 import datetime as dt
 from app.models import User
+from ccdexplorer_fundamentals.mongodb import (
+    CollectionsUtilities,
+    Collections,
+    MongoTypeBlockPerDay,
+)
 
 
 # from ccdexplorer_fundamentals.mongodb import MongoMotor
@@ -83,3 +88,73 @@ async def get_api_keys(req: Request = None, motormongo=None, app=None):
             req.app.api_keys = keys
             req.app.api_keys_last_requested = now
     return keys
+
+
+def get_exchange_rates(
+    req: Request = None,
+    motormongo=None,
+    app=None,
+):
+    collection = req.app.mongodb.utilities if req else app.mongodb.utilities
+    exchange_rates = req.app.exchange_rates if req else app.exchange_rates
+    exchange_rates_last_requested = (
+        req.app.exchange_rates_last_requested
+        if req
+        else app.exchange_rates_last_requested
+    )
+    if (
+        (
+            dt.datetime.now().astimezone(dt.timezone.utc)
+            - exchange_rates_last_requested
+        ).total_seconds()
+        < 10
+    ) and (exchange_rates):
+        pass
+
+    else:
+        coll = collection[CollectionsUtilities.exchange_rates]
+
+        exchange_rates = {x["token"]: x for x in coll.find({})}
+
+        exchange_rates_last_requested = dt.datetime.now().astimezone(dt.timezone.utc)
+        if req:
+            req.app.exchange_rates = exchange_rates
+            req.app.exchange_rates_last_requested = exchange_rates_last_requested
+        else:
+            app.exchange_rates = exchange_rates
+            app.exchange_rates_last_requested = exchange_rates_last_requested
+    return exchange_rates
+
+
+def get_blocks_per_day(
+    req: Request,
+):
+    if (
+        (
+            dt.datetime.now().astimezone(dt.timezone.utc)
+            - req.app.blocks_per_day_last_requested
+        ).total_seconds()
+        < 60
+    ) and (req.app.blocks_per_day):
+        pass
+
+    else:
+        if "net" in req.path_params:
+            db_to_use = (
+                req.app.mongodb.testnet
+                if req.path_params["net"] == "testnet"
+                else req.app.mongodb.mainnet
+            )
+        else:
+            db_to_use = req.app.mongodb.mainnet
+
+        result = {
+            x["_id"]: MongoTypeBlockPerDay(**x)
+            for x in db_to_use[Collections.blocks_per_day].find({})
+        }
+        req.app.blocks_per_day = result
+        req.app.blocks_per_day_last_requested = dt.datetime.now().astimezone(
+            dt.timezone.utc
+        )
+
+    return req.app.blocks_per_day
