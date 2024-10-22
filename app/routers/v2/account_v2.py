@@ -1266,3 +1266,31 @@ async def get_account_rewards_for_flow_graph(
             status_code=404,
             detail=f"Can't determine whether account {account_id} on {net}  has rewards with error {error}.",
         )
+
+
+@router.get(
+    "/{net}/account/{account_id}/deployed",
+    response_class=JSONResponse,
+)
+async def get_module_deployment_tx(
+    request: Request,
+    net: str,
+    account_id: str,
+    mongodb: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> CCD_BlockItemSummary:
+    """
+    Endpoint to get tx in which the account was deployed.
+    """
+    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    pipeline = [
+        {"$match": {"account_creation": {"$exists": True}}},
+        {"$match": {"account_creation.address": account_id}},
+    ]
+    result = (
+        await db_to_use[Collections.transactions].aggregate(pipeline).to_list(length=1)
+    )
+
+    if result:
+        result = CCD_BlockItemSummary(**result[0])
+        return result
