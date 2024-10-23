@@ -75,6 +75,8 @@ async def plans_reset_plan(
         ]
     )
 
+    # reset redis key
+    await request.app.redis.delete(f"v2:*:{user.api_account_id}:day")
     # delete keys for all plans
     result = (
         await request.app.motormongo.utilities_db["api_api_keys"]

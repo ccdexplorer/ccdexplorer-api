@@ -1,4 +1,5 @@
 import grpc
+from pymongo.collection import Collection
 from ccdexplorer_fundamentals.enums import NET
 from ccdexplorer_fundamentals.cis import MongoTypeLoggedEvent
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
@@ -49,11 +50,13 @@ router = APIRouter(tags=["Account"], prefix="/v2")
 
 
 async def convert_account_fungible_tokens_value_to_USD(
-    tokens_dict: dict[str, TokenHolding], db_to_use, exchange_rates
+    tokens_dict: dict[str, TokenHolding], db_to_use: Collection, exchange_rates
 ):
     tokens_tags = {
         x["contracts"][0]: x
-        for x in db_to_use[Collections.tokens_tags].find({"token_type": "fungible"})
+        for x in await db_to_use[Collections.tokens_tags]
+        .find({"token_type": "fungible"})
+        .to_list(length=None)
     }
 
     tokens_with_metadata: dict[str, TokenHolding] = {}
@@ -148,7 +151,7 @@ async def get_account_fungible_tokens_value_in_USD(
     request: Request,
     net: str,
     account_address: str,
-    mongodb: MongoDB = Depends(get_mongo_db),
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> float:
@@ -157,12 +160,29 @@ async def get_account_fungible_tokens_value_in_USD(
 
 
     """
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
-    result_list = list(
-        db_to_use[Collections.tokens_links_v2].find(
-            {"account_address_canonical": account_address[:29]}
-        )
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+
+    # first get all contracts for fungible tokens
+    fungible_contracts = {
+        x["contracts"][0]: x
+        for x in await db_to_use[Collections.tokens_tags]
+        .find({"token_type": "fungible"}, {"_id": 1, "contracts": 1})
+        .to_list(length=None)
+    }
+    pipeline = [
+        {
+            "$match": {
+                "token_holding.contract": {"$in": list(fungible_contracts.keys())}
+            }
+        },
+        {"$match": {"account_address_canonical": account_address[:29]}},
+    ]
+    result_list = (
+        await db_to_use[Collections.tokens_links_v2]
+        .aggregate(pipeline)
+        .to_list(length=None)
     )
+
     tokens = [TokenHolding(**x["token_holding"]) for x in result_list]
 
     if len(tokens) > 0:
@@ -187,16 +207,25 @@ async def get_account_token_symbols_for_flow(
     request: Request,
     net: str,
     account_address: str,
-    mongodb: MongoDB = Depends(get_mongo_db),
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[str]:
     """
-    Endpoint to get all tokens for a given account, even if the current balance is zero.
+    Endpoint to get all fungible tokens for a given account, even if the current balance is zero.
 
 
     """
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+
+    # first get all contracts for fungible tokens
+    fungible_contracts = {
+        x["contracts"][0]: x
+        for x in await db_to_use[Collections.tokens_tags]
+        .find({"token_type": "fungible"}, {"_id": 1, "contracts": 1})
+        .to_list(length=None)
+    }
     pipeline = [
+        {"$match": {"contract": {"$in": list(fungible_contracts.keys())}}},
         {
             "$match": {
                 "$or": [
@@ -217,19 +246,18 @@ async def get_account_token_symbols_for_flow(
             }
         },
     ]
-    contracts = list(db_to_use[Collections.tokens_logged_events].aggregate(pipeline))
+    contracts = (
+        await db_to_use[Collections.tokens_logged_events]
+        .aggregate(pipeline)
+        .to_list(length=None)
+    )
     if len(contracts) > 0:
         contracts_for_account = [x["contract"] for x in contracts]
-        tokens_tags_contracts = {
-            x["contracts"][0]: x
-            for x in db_to_use[Collections.tokens_tags].find(
-                {"token_type": "fungible"}, {"_id": 1, "contracts": 1}
-            )
-        }
+
         return sorted(
             [
                 value["_id"]
-                for key, value in tokens_tags_contracts.items()
+                for key, value in fungible_contracts.items()
                 if key in contracts_for_account
             ]
         )

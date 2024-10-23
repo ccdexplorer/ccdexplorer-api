@@ -278,3 +278,66 @@ async def get_node_info(
             status_code=404,
             detail="Error requesting nodes for {net}.",
         )
+
+
+@router.get(
+    "/{net}/misc/projects/all-ids",
+    response_class=JSONResponse,
+)
+async def get_all_project_ids(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+
+    project_ids = {}
+    result = (
+        await mongomotor.utilities[CollectionsUtilities.projects]
+        .find({})
+        .to_list(length=None)
+    )
+    for project in result:
+        project_ids[project["project_id"]] = project
+
+    return project_ids
+
+
+@router.get(
+    "/{net}/misc/projects/{project_id}",
+    response_class=JSONResponse,
+)
+async def get_project_id(
+    request: Request,
+    net: str,
+    project_id: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+
+    result = await mongomotor.utilities[CollectionsUtilities.projects].find_one(
+        {"project_id": project_id}
+    )
+
+    return result
+
+
+@router.get(
+    "/{net}/misc/projects/{project_id}/addresses",
+    response_class=JSONResponse,
+)
+async def get_project_addresses(
+    request: Request,
+    net: str,
+    project_id: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    project_addresses = (
+        await db_to_use[Collections.projects]
+        .find({"project_id": project_id})
+        .to_list(length=None)
+    )
+
+    return project_addresses
