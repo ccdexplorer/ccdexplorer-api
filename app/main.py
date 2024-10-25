@@ -49,6 +49,7 @@ from app.routers.v2 import (
     transaction_v2,
     transactions_v2,
     module_v2,
+    site_user_v2,
 )
 
 grpcclient = GRPCClient()
@@ -188,6 +189,8 @@ app.include_router(home.router)
 app.include_router(account.router)
 app.include_router(plans.router)
 
+# site user
+app.include_router(site_user_v2.router)
 
 # @app.get("/docs", include_in_schema=False)
 # async def custom_swagger_ui_html_cdn():

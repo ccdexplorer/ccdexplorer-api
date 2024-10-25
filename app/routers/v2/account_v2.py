@@ -224,15 +224,16 @@ async def get_account_token_symbols_for_flow(
         .find({"token_type": "fungible"}, {"_id": 1, "contracts": 1})
         .to_list(length=None)
     }
+
     pipeline = [
+        {"$match": {"effect_type": {"$ne": "data_registered"}}},
+        {"$match": {"contract": {"$exists": True}}},
+        {
+            "$match": {"impacted_address_canonical": {"$eq": account_address[:29]}},
+        },
         {"$match": {"contract": {"$in": list(fungible_contracts.keys())}}},
         {
-            "$match": {
-                "$or": [
-                    {"result.to_address": account_address},
-                    {"result.from_address": account_address},
-                ]
-            }
+            "$match": {"event_type": {"$exists": True}},
         },
         {
             "$group": {
@@ -247,10 +248,11 @@ async def get_account_token_symbols_for_flow(
         },
     ]
     contracts = (
-        await db_to_use[Collections.tokens_logged_events]
+        await db_to_use[Collections.impacted_addresses]
         .aggregate(pipeline)
         .to_list(length=None)
     )
+
     if len(contracts) > 0:
         contracts_for_account = [x["contract"] for x in contracts]
 
@@ -1144,7 +1146,7 @@ async def get_account_token_transactions_for_flow_graph(
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[MongoTypeLoggedEvent]:
     """
-    Endpoint to get all token txs for a given account that should be included in the flow graph for CCD.
+    Endpoint to get all token txs for a given account that should be included in the flow graph for a token.
     """
     amended_start_date = (
         f"{(dateutil.parser.parse(start_date)-dt.timedelta(days=1)):%Y-%m-%d}"
@@ -1172,8 +1174,8 @@ async def get_account_token_transactions_for_flow_graph(
             {
                 "$match": {
                     "$or": [
-                        {"result.to_address": account_id},
-                        {"result.from_address": account_id},
+                        {"to_address_canonical": account_id[:29]},
+                        {"from_address_canonical": account_id[:29]},
                     ]
                 }
             },
@@ -1300,13 +1302,13 @@ async def get_account_rewards_for_flow_graph(
     "/{net}/account/{account_id}/deployed",
     response_class=JSONResponse,
 )
-async def get_module_deployment_tx(
+async def get_account_deployment_tx(
     request: Request,
     net: str,
     account_id: str,
     mongodb: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
-) -> CCD_BlockItemSummary:
+) -> CCD_BlockItemSummary | None:
     """
     Endpoint to get tx in which the account was deployed.
     """
@@ -1319,6 +1321,54 @@ async def get_module_deployment_tx(
         await db_to_use[Collections.transactions].aggregate(pipeline).to_list(length=1)
     )
 
-    if result:
+    if len(result) > 0:
         result = CCD_BlockItemSummary(**result[0])
         return result
+    else:
+        # account existed in genesis block
+        return None
+
+
+@router.get(
+    "/{net}/account/{account_address}/aliases-in-use",
+    response_class=JSONResponse,
+)
+async def get_aliases_in_use_for_account(
+    request: Request,
+    net: str,
+    account_address: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> list[dict]:
+    """
+    Endpoint to get all aliases that are in use for a specific account address.
+
+
+    """
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    pipeline = [
+        {
+            "$match": {"effect_type": {"$ne": "data_registered"}},
+        },
+        {
+            "$match": {"impacted_address_canonical": {"$eq": account_address[:29]}},
+        },
+        {
+            "$group": {
+                "_id": "$impacted_address",
+            }
+        },
+        {
+            "$project": {
+                "_id": 1,
+            }
+        },
+    ]
+    result = (
+        await db_to_use[Collections.impacted_addresses]
+        .aggregate(pipeline)
+        .to_list(length=None)
+    )
+
+    aliases = [x for x in result if x["_id"] != account_address]
+    return aliases

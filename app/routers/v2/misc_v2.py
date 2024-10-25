@@ -185,6 +185,100 @@ async def get_labeled_accounts(
     return JSONResponse(tags)
 
 
+@router.get(
+    "/{net}/misc/community-labeled-accounts",
+    response_class=JSONResponse,
+)
+async def get_community_labeled_accounts(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+    """
+    Endpoint to get community labeled accounts (indexes).
+    """
+
+    # labeled accounts only exist for mainnet
+    db_to_use = mongomotor.mainnet
+    db_utilities = mongomotor.utilities
+
+    result = (
+        await db_utilities[CollectionsUtilities.labeled_accounts]
+        .find({})
+        .to_list(length=None)
+    )
+    labeled_accounts = {}
+    for r in result:
+        current_group = labeled_accounts.get(r["label_group"], {})
+        if "account_index" in r:
+            current_group[r["account_index"]] = r["label"]
+        else:
+            current_group[r["_id"]] = r["label"]
+        labeled_accounts[r["label_group"]] = current_group
+
+    result = (
+        await db_utilities[CollectionsUtilities.labeled_accounts_metadata]
+        .find({})
+        .to_list(length=None)
+    )
+
+    colors = {}
+    descriptions = {}
+    for r in result:
+        colors[r["_id"]] = r.get("color")
+        descriptions[r["_id"]] = r.get("description")
+
+    ### insert projects into tags
+    # display_names
+    projects_display_names = {
+        x["_id"]: x["display_name"]
+        for x in await db_utilities[CollectionsUtilities.projects]
+        .find({})
+        .to_list(length=None)
+    }
+    # account addresses
+    project_account_addresses = (
+        await db_to_use[Collections.projects]
+        .find({"type": "account_address"})
+        .to_list(length=None)
+    )
+
+    dd = {}
+    for paa in project_account_addresses:
+        dd[paa["account_index"]] = projects_display_names[paa["project_id"]]
+    labeled_accounts["projects"] = dd
+
+    # contract addresses
+    project_contract_addresses = (
+        await db_to_use[Collections.projects]
+        .find({"type": "contract_address"})
+        .to_list(length=None)
+    )
+
+    dd = {}
+    for paa in project_contract_addresses:
+        dd[paa["contract_address"]] = projects_display_names[paa["project_id"]]
+    labeled_accounts["contracts"].update(dd)
+
+    labels_melt = {}
+    for label_group in labeled_accounts.keys():
+        label_group_color = colors[label_group]
+        for address, tag in labeled_accounts[label_group].items():
+            labels_melt[address] = {
+                "label": tag,
+                "group": label_group,
+                "color": label_group_color,
+            }
+
+    tags = {
+        "labels_melt": labels_melt,
+        "descriptions": descriptions,
+    }
+
+    return JSONResponse(tags)
+
+
 def generate_dates_from_start_until_end(start: str, end: str):
     start_date = dateutil.parser.parse(start)
     end_date = dateutil.parser.parse(end)
@@ -220,6 +314,38 @@ async def get_tx_data_for_project(
         {"$match": {"date": {"$in": dates_to_include}}},
         {"$match": {"type": "statistics_transaction_types"}},
         {"$match": {"project": project_id}},
+        {"$project": {"_id": 0, "type": 0, "usecase": 0}},
+        {"$sort": {"date": 1}},
+    ]
+    result = (
+        await mongomotor.mainnet[Collections.statistics]
+        .aggregate(pipeline)
+        .to_list(length=None)
+    )
+    return JSONResponse([x for x in result])
+
+
+@router.get(
+    "/{net}/misc/statistics/{analysis}/{start_date}/{end_date}",
+    response_class=JSONResponse,
+)
+async def get_data_for_analysis(
+    request: Request,
+    net: str,
+    analysis: str,
+    start_date: str,
+    end_date: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+    """
+    Endpoint to get data for analysis.
+    """
+
+    dates_to_include = generate_dates_from_start_until_end(start_date, end_date)
+    pipeline = [
+        {"$match": {"date": {"$in": dates_to_include}}},
+        {"$match": {"type": analysis}},
         {"$project": {"_id": 0, "type": 0, "usecase": 0}},
         {"$sort": {"date": 1}},
     ]
