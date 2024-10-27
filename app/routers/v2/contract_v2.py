@@ -341,7 +341,7 @@ async def get_instance_tag_information(
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
-    Endpoint to get the recorgnized tag information for a smart contract.
+    Endpoint to get the recognized tag information for a smart contract.
     """
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet

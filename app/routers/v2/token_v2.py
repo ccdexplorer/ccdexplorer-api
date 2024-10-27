@@ -7,11 +7,24 @@ from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_ContractAddress
 from ccdexplorer_fundamentals.enums import NET
 from ccdexplorer_fundamentals.mongodb import (
     MongoDB,
+    MongoMotor,
     Collections,
 )
 from pydantic import BaseModel
 from pymongo import ReplaceOne
-from app.state_getters import get_mongo_db, get_grpcclient
+from app.state_getters import get_mongo_db, get_grpcclient, get_mongo_motor
+from json import dumps, loads
+
+
+from datetime import date, datetime
+
+
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError("Type %s not serializable" % type(obj))
 
 
 class TokenHolding(BaseModel):
@@ -54,6 +67,92 @@ def get_owner_history_for_provenance(
 
 
 @router.get(
+    "/{net}/token/tag/{tag}/token-id/{token_id}/info",
+    response_class=JSONResponse,
+)
+async def get_token_based_on_token_id(
+    request: Request,
+    net: str,
+    tag: str,
+    token_id: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+    """
+    Endpoint to get a token based on tag and token_id.
+    """
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    tag_result = await db_to_use[Collections.tokens_tags].find_one({"_id": tag})
+    if tag_result:
+        pipeline = [
+            {"$match": {"contract": {"$in": tag_result["contracts"]}}},
+            {"$match": {"token_id": token_id}},
+            {"$limit": 1},
+        ]
+        result = (
+            await db_to_use[Collections.tokens_token_addresses_v2]
+            .aggregate(pipeline)
+            .to_list(length=1)
+        )
+        if len(result) > 0:
+            the_token = result[0]
+            # add verified information
+            instance_address = f"{the_token['contract']}"
+            result = await db_to_use[Collections.tokens_tags].find_one(
+                {"contracts": {"$in": [instance_address]}}
+            )
+            the_token.update({"verified_information": result})
+            # get mint event from the logged events collection
+            mint_event_logged_event = await db_to_use[
+                Collections.tokens_logged_events
+            ].find_one(
+                {
+                    "$and": [
+                        {"token_address": the_token["_id"]},
+                        {"event_type": "mint_event"},
+                    ]
+                }
+            )
+            the_token.update({"mint_tx_hash": mint_event_logged_event["tx_hash"]})
+
+            pipeline = [
+                {"$match": {"token_holding.token_address": the_token["_id"]}},
+                {
+                    "$facet": {
+                        "metadata": [{"$count": "total"}],
+                    }
+                },
+                {
+                    "$project": {
+                        "total": {"$arrayElemAt": ["$metadata.total", 0]},
+                    }
+                },
+            ]
+            result = (
+                await db_to_use[Collections.tokens_links_v2]
+                .aggregate(pipeline)
+                .to_list(1)
+            )
+            if "total" in result[0]:
+                current_holders_count = result[0]["total"]
+            else:
+                current_holders_count = 0
+            the_token.update({"current_holders_count": current_holders_count})
+
+            return the_token
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested smart contract tag information for '{tag}' and {token_id} not found on {net}.",
+        )
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested smart contract tag information for '{tag}' not found on {net}.",
+        )
+
+
+@router.get(
     "/{net}/token/{contract_index}/{contract_subindex}/{token_id}/info",
     response_class=JSONResponse,
 )
@@ -62,8 +161,8 @@ async def get_info_for_token_address(
     net: str,
     contract_index: int,
     contract_subindex: int,
-    token_id: str | None,
-    mongodb: MongoDB = Depends(get_mongo_db),
+    token_id: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
@@ -71,41 +170,72 @@ async def get_info_for_token_address(
     Endpoint to get information for a given token address. For Provenance Tags specifically, the `owner_history`
     property is added if available.
     """
-    # token_id = "" if token_id == "_" else token_id
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    token_id = "" if token_id == "_" else token_id
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     token_address = f"<{contract_index},{contract_subindex}>-{token_id}"
-    token_from_collection = db_to_use[Collections.tokens_token_addresses_v2].find_one(
-        {"_id": token_address}
-    )
+    token_from_collection = await db_to_use[
+        Collections.tokens_token_addresses_v2
+    ].find_one({"_id": token_address})
 
     if token_from_collection:
+        # tag information if available
+        instance_address = f"<{contract_index},{contract_subindex}>"
+        result = await db_to_use[Collections.tokens_tags].find_one(
+            {"contracts": {"$in": [instance_address]}}
+        )
+        token_from_collection.update({"verified_information": result})
+
         # get mint event from the logged events collection
-        mint_event_logged_event = db_to_use[Collections.tokens_logged_events].find_one(
+        mint_event_logged_event = await db_to_use[
+            Collections.tokens_logged_events
+        ].find_one(
             {"$and": [{"token_address": token_address}, {"event_type": "mint_event"}]}
         )
         token_from_collection.update(
             {"mint_tx_hash": mint_event_logged_event["tx_hash"]}
         )
 
-        # get current owner from the token_links collection
-        current_owner_link = list(
-            db_to_use[Collections.tokens_links_v2].find(
-                {"token_holding.token_address": token_address}
-            )
-        )
-        current_owners = []
-        for link in current_owner_link:
-            current_owners.append(
-                {
-                    "address": link["account_address"],
-                    "balance": int(link["token_holding"]["token_amount"]),
+        pipeline = [
+            {"$match": {"token_holding.token_address": token_address}},
+            {
+                "$facet": {
+                    "metadata": [{"$count": "total"}],
                 }
-            )
+            },
+            {
+                "$project": {
+                    "total": {"$arrayElemAt": ["$metadata.total", 0]},
+                }
+            },
+        ]
+        result = (
+            await db_to_use[Collections.tokens_links_v2].aggregate(pipeline).to_list(1)
+        )
+        if "total" in result[0]:
+            current_holders_count = result[0]["total"]
+        else:
+            current_holders_count = 0
+        token_from_collection.update({"current_holders_count": current_holders_count})
+        # # get current owner from the token_links collection
+        # current_owner_link = (
+        #     await db_to_use[Collections.tokens_links_v2]
+        #     .find({"token_holding.token_address": token_address})
+        #     .to_list(length=None)
+        # )
 
-        token_from_collection.update({"current_owners": current_owners})
+        # current_owners = []
+        # for link in current_owner_link:
+        #     current_owners.append(
+        #         {
+        #             "address": link["account_address"],
+        #             "balance": int(link["token_holding"]["token_amount"]),
+        #         }
+        #     )
+
+        # token_from_collection.update({"current_owners": current_owners})
 
         # Provenance Tags Owner History
-        provenance_tag_stored = db_to_use[Collections.tokens_tags].find_one(
+        provenance_tag_stored = await db_to_use[Collections.tokens_tags].find_one(
             {"_id": "provenance-tags"}
         )
         if provenance_tag_stored:
@@ -123,11 +253,82 @@ async def get_info_for_token_address(
         if "token_holders" in token_from_collection:
             del token_from_collection["token_holders"]
 
-        return JSONResponse(token_from_collection)
+        return loads(dumps(token_from_collection, default=json_serial))
     else:
         raise HTTPException(
             status_code=404,
             detail=f"Requested token_id {token_id} from contract <{contract_index},{contract_subindex}> is not found on {net}.",
+        )
+
+
+@router.get(
+    "/{net}/token/{contract_index}/{contract_subindex}/{token_id}/holders/{skip}/{limit}",
+    response_class=JSONResponse,
+)
+async def get_token_current_holders(
+    request: Request,
+    net: str,
+    contract_index: int,
+    contract_subindex: int,
+    token_id: str,
+    skip: int,
+    limit: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """
+    Endpoint to get current token holders for token.
+    """
+    token_id = "" if token_id == "_" else token_id
+    token_address = f"<{contract_index},{contract_subindex}>-{token_id}"
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    try:
+        pipeline = [
+            {"$match": {"token_holding.token_address": token_address}},
+            {
+                "$addFields": {
+                    "token_holding.token_amount_numeric": {
+                        "$toDouble": "$token_holding.token_amount"
+                    }
+                }
+            },
+            # Sort by the numeric version of token_holding.token_amount
+            {"$sort": {"token_holding.token_amount_numeric": -1}},
+            {
+                "$facet": {
+                    "metadata": [{"$count": "total"}],
+                    "data": [{"$skip": skip}, {"$limit": limit}],
+                }
+            },
+            {
+                "$project": {
+                    "data": 1,
+                    "total": {"$arrayElemAt": ["$metadata.total", 0]},
+                }
+            },
+        ]
+        result = (
+            await db_to_use[Collections.tokens_links_v2]
+            .aggregate(pipeline)
+            .to_list(limit)
+        )
+        current_holders = [x for x in result[0]["data"]]
+        if "total" in result[0]:
+            total_count = result[0]["total"]
+        else:
+            total_count = 0
+
+    except Exception as error:
+        print(error)
+        result = None
+
+    if result is not None:
+
+        return {"current_holders": current_holders, "total_count": total_count}
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Can't retrieve current holders for token at {token_address} on {net}",
         )
 
 
@@ -232,4 +433,30 @@ async def add_token_address_to_metadata_refresh_queue(
         raise HTTPException(
             status_code=404,
             detail=f"Requested token_id {token_id} from contract <{contract_index},{contract_subindex}> is not found on {net}.",
+        )
+
+
+@router.get(
+    "/{net}/token/tag/{tag}",
+    response_class=JSONResponse,
+)
+async def get_instance_tag_information(
+    request: Request,
+    net: str,
+    tag: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+    """
+    Endpoint to get the recognized tag information from a tag id.
+    """
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    result = await db_to_use[Collections.tokens_tags].find_one({"_id": tag})
+    if result:
+        return result
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested smart contract tag information for '{tag}' not found on {net}.",
         )
