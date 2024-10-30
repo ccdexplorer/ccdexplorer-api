@@ -44,6 +44,8 @@ class TokenHolding(BaseModel):
     token_symbol: Optional[str] = None
     token_value: Optional[float] = None
     token_value_USD: Optional[float] = None
+    verified_information: Optional[dict] = None
+    address_information: Optional[dict] = None
 
 
 router = APIRouter(tags=["Account"], prefix="/v2")
@@ -270,34 +272,238 @@ async def get_account_token_symbols_for_flow(
         )
 
 
-@router.get("/{net}/account/{account_address}/tokens", response_class=JSONResponse)
-async def get_account_tokens(
+@router.get(
+    "/{net}/account/{account_address}/fungible-tokens/{skip}/{limit}/verified",
+    response_class=JSONResponse,
+)
+async def get_account_fungible_tokens_verified(
     request: Request,
     net: str,
     account_address: str,
-    mongodb: MongoDB = Depends(get_mongo_db),
+    skip: int,
+    limit: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
-) -> list[TokenHolding]:
+) -> dict:
     """
-    Endpoint to get all tokens for a given account, as stored in MongoDB collection `tokens_links_v2`.
-
-
+    Endpoint to get verified fungible tokens for a given account, as stored in MongoDB collection `tokens_links_v2`.
     """
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
-    result_list = list(
-        db_to_use[Collections.tokens_links_v2].find(
-            {"account_address_canonical": account_address[:29]}
-        )
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    fungible_token_addresses = [
+        x["related_token_address"]
+        for x in await db_to_use[Collections.tokens_tags]
+        .find({"token_type": "fungible"}, {"related_token_address": 1})
+        .to_list(length=None)
+    ]
+
+    pipeline = [
+        {"$match": {"account_address_canonical": account_address[:29]}},
+        {"$match": {"token_holding.token_address": {"$in": fungible_token_addresses}}},
+        {
+            "$facet": {
+                "metadata": [{"$count": "total"}],
+                "data": [{"$skip": skip}, {"$limit": limit}],
+            }
+        },
+        {
+            "$project": {
+                "data": 1,
+                "total": {"$arrayElemAt": ["$metadata.total", 0]},
+            }
+        },
+    ]
+    result = (
+        await db_to_use[Collections.tokens_links_v2]
+        .aggregate(pipeline)
+        .to_list(length=None)
     )
-    tokens = [TokenHolding(**x["token_holding"]) for x in result_list]
+    all_tokens = [x for x in result[0]["data"]]
+    if "total" in result[0]:
+        total_token_count = result[0]["total"]
+    else:
+        total_token_count = 0
+    tokens = [TokenHolding(**x["token_holding"]) for x in all_tokens]
+
+    # add verified information and metadata and USD value
+    for token in tokens:
+
+        result = await db_to_use[Collections.tokens_tags].find_one(
+            {"related_token_address": token.token_address}
+        )
+        token.verified_information = result
+        token.token_symbol = token.verified_information["get_price_from"]
+        token.decimals = token.verified_information["decimals"]
+        token.token_value = int(token.token_amount) * (math.pow(10, -token.decimals))
+        if token.token_symbol in exchange_rates:
+            token.token_value_USD = (
+                token.token_value * exchange_rates[token.token_symbol]["rate"]
+            )
+        else:
+            token.token_value_USD = 1
+
+        result = await db_to_use[Collections.tokens_token_addresses_v2].find_one(
+            {"_id": token.token_address}
+        )
+        token.address_information = result
 
     if len(tokens) > 0:
 
-        return tokens
+        return {"tokens": tokens, "total_token_count": total_token_count}
     else:
         raise HTTPException(
             status_code=404,
-            detail=f"Requested account ({account_address}) has no tokens on {net}",
+            detail=f"Requested account ({account_address}) has no fungible verified tokens on {net}",
+        )
+
+
+@router.get(
+    "/{net}/account/{account_address}/non-fungible-tokens/{skip}/{limit}/verified",
+    response_class=JSONResponse,
+)
+async def get_account_non_fungible_tokens_verified(
+    request: Request,
+    net: str,
+    account_address: str,
+    skip: int,
+    limit: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    exchange_rates: dict = Depends(get_exchange_rates),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """
+    Endpoint to get verified non fungible tokens for a given account, as stored in MongoDB collection `tokens_links_v2`.
+    """
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    non_fungible_token_contracts = [
+        x["contracts"]
+        for x in await db_to_use[Collections.tokens_tags]
+        .find({"token_type": "non-fungible"}, {"contracts": 1})
+        .to_list(length=None)
+    ]
+    non_fungible_token_contracts = [
+        item for row in non_fungible_token_contracts for item in row
+    ]
+    pipeline = [
+        {"$match": {"account_address_canonical": account_address[:29]}},
+        {"$match": {"token_holding.contract": {"$in": non_fungible_token_contracts}}},
+        {
+            "$facet": {
+                "metadata": [{"$count": "total"}],
+                "data": [{"$skip": skip}, {"$limit": limit}],
+            }
+        },
+        {
+            "$project": {
+                "data": 1,
+                "total": {"$arrayElemAt": ["$metadata.total", 0]},
+            }
+        },
+    ]
+    result = (
+        await db_to_use[Collections.tokens_links_v2]
+        .aggregate(pipeline)
+        .to_list(length=None)
+    )
+    all_tokens = [x for x in result[0]["data"]]
+    if "total" in result[0]:
+        total_token_count = result[0]["total"]
+    else:
+        total_token_count = 0
+    tokens = [TokenHolding(**x["token_holding"]) for x in all_tokens]
+
+    # add verified information and metadata and USD value
+    for token in tokens:
+
+        result = await db_to_use[Collections.tokens_tags].find_one(
+            {"contracts": {"$in": [token.contract]}}
+        )
+        token.verified_information = result
+
+        result = await db_to_use[Collections.tokens_token_addresses_v2].find_one(
+            {"_id": token.token_address}
+        )
+        token.address_information = result
+
+    if len(tokens) > 0:
+
+        return {"tokens": tokens, "total_token_count": total_token_count}
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested account ({account_address}) has no fungible verified tokens on {net}",
+        )
+
+
+@router.get(
+    "/{net}/account/{account_address}/tokens/{skip}/{limit}/unverified",
+    response_class=JSONResponse,
+)
+async def get_account_tokens_unverified(
+    request: Request,
+    net: str,
+    account_address: str,
+    skip: int,
+    limit: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    exchange_rates: dict = Depends(get_exchange_rates),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """
+    Endpoint to get unverified tokens for a given account, as stored in MongoDB collection `tokens_links_v2`.
+    """
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    verified_token_contracts = [
+        x["contracts"]
+        for x in await db_to_use[Collections.tokens_tags]
+        .find({}, {"contracts": 1})
+        .to_list(length=None)
+    ]
+    verified_token_contracts = [
+        item for row in verified_token_contracts for item in row
+    ]
+    pipeline = [
+        {"$match": {"account_address_canonical": account_address[:29]}},
+        {"$match": {"token_holding.contract": {"$nin": verified_token_contracts}}},
+        {
+            "$facet": {
+                "metadata": [{"$count": "total"}],
+                "data": [{"$skip": skip}, {"$limit": limit}],
+            }
+        },
+        {
+            "$project": {
+                "data": 1,
+                "total": {"$arrayElemAt": ["$metadata.total", 0]},
+            }
+        },
+    ]
+    result = (
+        await db_to_use[Collections.tokens_links_v2]
+        .aggregate(pipeline)
+        .to_list(length=None)
+    )
+    all_tokens = [x for x in result[0]["data"]]
+    if "total" in result[0]:
+        total_token_count = result[0]["total"]
+    else:
+        total_token_count = 0
+    tokens = [TokenHolding(**x["token_holding"]) for x in all_tokens]
+
+    # add metadata
+    for token in tokens:
+        result = await db_to_use[Collections.tokens_token_addresses_v2].find_one(
+            {"_id": token.token_address}
+        )
+        token.address_information = result
+
+    if len(tokens) > 0:
+
+        return {"tokens": tokens, "total_token_count": total_token_count}
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested account ({account_address}) has no fungible verified tokens on {net}",
         )
 
 

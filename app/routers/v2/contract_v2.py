@@ -362,7 +362,7 @@ async def get_instance_tag_information(
     "/{net}/contract/{contract_index}/{contract_subindex}/deployed",
     response_class=JSONResponse,
 )
-async def get_module_deployment_tx(
+async def get_contract_deployment_tx(
     request: Request,
     net: str,
     contract_index: int,

@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from pymongo import ReplaceOne
 from app.state_getters import get_mongo_db, get_grpcclient, get_mongo_motor
 from json import dumps, loads
-
+from typing import Optional
 
 from datetime import date, datetime
 
@@ -66,6 +66,7 @@ def get_owner_history_for_provenance(
     return ci.viewOwnerHistoryResponse(result)
 
 
+@router.get("/{net}/token/tag/{tag}/info", response_class=JSONResponse)
 @router.get(
     "/{net}/token/tag/{tag}/token-id/{token_id}/info",
     response_class=JSONResponse,
@@ -74,7 +75,7 @@ async def get_token_based_on_token_id(
     request: Request,
     net: str,
     tag: str,
-    token_id: str,
+    token_id: Optional[str] = None,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
@@ -84,12 +85,19 @@ async def get_token_based_on_token_id(
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     tag_result = await db_to_use[Collections.tokens_tags].find_one({"_id": tag})
+
     if tag_result:
-        pipeline = [
-            {"$match": {"contract": {"$in": tag_result["contracts"]}}},
-            {"$match": {"token_id": token_id}},
-            {"$limit": 1},
-        ]
+        if not token_id:
+            pipeline = [
+                {"$match": {"_id": tag_result["related_token_address"]}},
+                {"$limit": 1},
+            ]
+        else:
+            pipeline = [
+                {"$match": {"contract": {"$in": tag_result["contracts"]}}},
+                {"$match": {"token_id": token_id}},
+                {"$limit": 1},
+            ]
         result = (
             await db_to_use[Collections.tokens_token_addresses_v2]
             .aggregate(pipeline)

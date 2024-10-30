@@ -144,38 +144,6 @@ async def get_labeled_accounts(
         colors[r["_id"]] = r.get("color")
         descriptions[r["_id"]] = r.get("description")
 
-    ### insert projects into tags
-    # display_names
-    projects_display_names = {
-        x["_id"]: x["display_name"]
-        for x in await db_utilities[CollectionsUtilities.projects]
-        .find({})
-        .to_list(length=None)
-    }
-    # account addresses
-    project_account_addresses = (
-        await db_to_use[Collections.projects]
-        .find({"type": "account_address"})
-        .to_list(length=None)
-    )
-
-    dd = {}
-    for paa in project_account_addresses:
-        dd[paa["account_address"]] = projects_display_names[paa["project_id"]]
-    labeled_accounts["projects"] = dd
-
-    # contract addresses
-    project_contract_addresses = (
-        await db_to_use[Collections.projects]
-        .find({"type": "contract_address"})
-        .to_list(length=None)
-    )
-
-    dd = {}
-    for paa in project_contract_addresses:
-        dd[paa["contract_address"]] = projects_display_names[paa["project_id"]]
-    labeled_accounts["contracts"].update(dd)
-
     tags = {
         "labels": labeled_accounts,
         "colors": colors,
@@ -271,8 +239,16 @@ async def get_community_labeled_accounts(
                 "color": label_group_color,
             }
 
+    colors = {}
+    descriptions = {}
+    for r in result:
+        colors[r["_id"]] = r.get("color")
+        descriptions[r["_id"]] = r.get("description")
+
     tags = {
         "labels_melt": labels_melt,
+        "labeled_accounts": labeled_accounts,
+        "colors": colors,
         "descriptions": descriptions,
     }
 
