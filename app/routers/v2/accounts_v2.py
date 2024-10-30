@@ -2,11 +2,17 @@ from ccdexplorer_fundamentals.mongodb import (
     Collections,
     MongoMotor,
 )
+from ccdexplorer_fundamentals.enums import NET
+from ccdexplorer_fundamentals.GRPCClient import GRPCClient
+from ccdexplorer_fundamentals.GRPCClient.CCD_Types import (
+    CCD_AccountInfo,
+    CCD_BlockItemSummary,
+)
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
 import json
-from app.state_getters import get_mongo_motor
+from app.state_getters import get_mongo_motor, get_grpcclient
 
 router = APIRouter(tags=["Accounts"], prefix="/v2")
 
@@ -152,4 +158,63 @@ async def get_current_payday_info(
         raise HTTPException(
             status_code=404,
             detail=f"Error retrieving current payday info, {error}.",
+        )
+
+
+@router.get("/{net}/accounts/last/{count}", response_class=JSONResponse)
+async def get_last_accounts(
+    request: Request,
+    net: str,
+    count: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
+) -> list[dict]:
+    """
+    Endpoint to get the last X accounts. Maxes out at 50.
+
+    """
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    count = min(50, max(count, 1))
+    try:
+        result = [
+            x["account_index"]
+            for x in await db_to_use[Collections.all_account_addresses]
+            .find({}, {"account_index": 1, "_id": 0})
+            .sort({"account_index": -1})
+            .to_list(count)
+        ]
+        error = None
+        accounts = []
+        for account_index in result:
+            account_info = grpcclient.get_account_info(
+                "last_final", account_index=account_index, net=NET(net)
+            )
+
+            pipeline = [
+                {"$match": {"account_creation": {"$exists": True}}},
+                {"$match": {"account_creation.address": account_info.address}},
+            ]
+            result = (
+                await db_to_use[Collections.transactions]
+                .aggregate(pipeline)
+                .to_list(length=1)
+            )
+
+            if len(result) > 0:
+                result = CCD_BlockItemSummary(**result[0])
+            else:
+                result = None
+            accounts.append({"account_info": account_info, "deployment_tx": result})
+
+    except Exception as error:
+        print(error)
+        result = None
+
+    if result:
+        return accounts
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Error retrieving last {count} accounts on {net}, {error}.",
         )
