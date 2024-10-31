@@ -3,12 +3,24 @@ from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
 from ccdexplorer_fundamentals.mongodb import (
     MongoDB,
+    MongoMotor,
     Collections,
 )
-from app.state_getters import get_mongo_motor
-
+from app.state_getters import get_mongo_motor, get_exchange_rates
+import math
+from typing import Optional
+from pydantic import BaseModel
 
 router = APIRouter(tags=["Tokens"], prefix="/v2")
+
+
+class FungibleToken(BaseModel):
+    decimals: Optional[int] = None
+    token_symbol: Optional[str] = None
+    token_value: Optional[float] = None
+    token_value_USD: Optional[float] = None
+    verified_information: Optional[dict] = None
+    address_information: Optional[dict] = None
 
 
 @router.get("/{net}/tokens/info/count", response_class=JSONResponse)
@@ -40,3 +52,58 @@ async def get_tokens_count_estimate(
             status_code=404,
             detail=f"Error retrieving tokens count on {net}, {error}.",
         )
+
+
+@router.get(
+    "/{net}/tokens/fungible-tokens/verified",
+    response_class=JSONResponse,
+)
+async def get_fungible_tokens_verified(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    exchange_rates: dict = Depends(get_exchange_rates),
+    api_key: str = Security(API_KEY_HEADER),
+) -> list:
+    """
+    Endpoint to get verified fungible tokens on 'net'.
+    """
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    fungible_tokens = (
+        await db_to_use[Collections.tokens_tags]
+        .find({"token_type": "fungible"})
+        .to_list(length=None)
+    )
+
+    # add verified information and metadata and USD value
+    fungible_result = []
+    for token in fungible_tokens:
+        print(token["_id"])
+        fungible_token = FungibleToken()
+        result = await db_to_use[Collections.tokens_token_addresses_v2].find_one(
+            {"_id": token["related_token_address"]}
+        )
+        fungible_token.address_information = result
+        fungible_token.verified_information = token
+
+        fungible_token.token_symbol = fungible_token.verified_information[
+            "get_price_from"
+        ]
+        fungible_token.token_value_USD = 0
+        if fungible_token.token_symbol:
+            fungible_token.decimals = fungible_token.verified_information["decimals"]
+            if fungible_token.address_information:
+                fungible_token.token_value = int(
+                    fungible_token.address_information.get("token_amount")
+                ) * (math.pow(10, -fungible_token.decimals))
+
+                if fungible_token.token_symbol in exchange_rates:
+                    fungible_token.token_value_USD = (
+                        fungible_token.token_value
+                        * exchange_rates[fungible_token.token_symbol]["rate"]
+                    )
+                else:
+                    fungible_token.token_value_USD = 0
+        fungible_result.append(fungible_token)
+
+    return fungible_result
