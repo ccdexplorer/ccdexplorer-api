@@ -23,6 +23,10 @@ class FungibleToken(BaseModel):
     address_information: Optional[dict] = None
 
 
+class NonFungibleToken(BaseModel):
+    verified_information: Optional[dict] = None
+
+
 @router.get("/{net}/tokens/info/count", response_class=JSONResponse)
 async def get_tokens_count_estimate(
     request: Request,
@@ -78,7 +82,6 @@ async def get_fungible_tokens_verified(
     # add verified information and metadata and USD value
     fungible_result = []
     for token in fungible_tokens:
-        print(token["_id"])
         fungible_token = FungibleToken()
         result = await db_to_use[Collections.tokens_token_addresses_v2].find_one(
             {"_id": token["related_token_address"]}
@@ -107,3 +110,34 @@ async def get_fungible_tokens_verified(
         fungible_result.append(fungible_token)
 
     return fungible_result
+
+
+@router.get(
+    "/{net}/tokens/non-fungible-tokens/verified",
+    response_class=JSONResponse,
+)
+async def get_non_fungible_tokens_verified(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    exchange_rates: dict = Depends(get_exchange_rates),
+    api_key: str = Security(API_KEY_HEADER),
+) -> list:
+    """
+    Endpoint to get verified non-fungible tokens on 'net'.
+    """
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    non_fungible_tokens = (
+        await db_to_use[Collections.tokens_tags]
+        .find({"token_type": "non-fungible"})
+        .to_list(length=None)
+    )
+
+    non_fungible_result = []
+    for token in non_fungible_tokens:
+        non_fungible_token = NonFungibleToken()
+        non_fungible_token.verified_information = token
+
+        non_fungible_result.append(non_fungible_token)
+
+    return non_fungible_result

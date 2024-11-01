@@ -468,3 +468,41 @@ async def get_instance_tag_information(
             status_code=404,
             detail=f"Requested smart contract tag information for '{tag}' not found on {net}.",
         )
+
+
+@router.get(
+    "/{net}/token/tag/{tag}/{skip}/{limit}",
+    response_class=JSONResponse,
+)
+async def get_nft_tag_tokens(
+    request: Request,
+    net: str,
+    tag: str,
+    skip: int,
+    limit: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+    """
+    Endpoint to get individual tokens for recognized nft tag.
+    """
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    tag_result = await db_to_use[Collections.tokens_tags].find_one({"_id": tag})
+    if not tag_result:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested tag '{tag}' not found on {net}.",
+        )
+
+    filter = {"contract": {"$in": tag_result["contracts"]}}
+    sort = list({"_id": 1}.items())
+    skip = 0
+    limit = 10
+    nft_tokens = (
+        await db_to_use[Collections.tokens_token_addresses_v2]
+        .find(filter=filter, sort=sort, skip=skip, limit=limit)
+        .to_list(length=limit)
+    )
+
+    return nft_tokens
