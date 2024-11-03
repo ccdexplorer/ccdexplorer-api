@@ -11,7 +11,7 @@ from ccdexplorer_fundamentals.mongodb import (
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
-
+import re
 from app.state_getters import get_grpcclient, get_mongo_motor
 
 router = APIRouter(tags=["Misc"], prefix="/v2")
@@ -443,3 +443,64 @@ async def get_project_addresses(
     )
 
     return project_addresses
+
+
+# @router.get("/{net}/misc/search/{search_term}", response_class=JSONResponse)
+# async def get_accounts_search(
+#     request: Request,
+#     net: str,
+#     search_term: str,
+#     mongomotor: MongoMotor = Depends(get_mongo_motor),
+#     api_key: str = Security(API_KEY_HEADER),
+# ) -> dict:
+#     """
+#     Endpoint to get to search for everything.
+
+#     """
+#     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+#     search_result = {}
+
+#     # # Accounts
+#     # search_on_address = (
+#     #     await db_to_use[Collections.all_account_addresses]
+#     #     .find({"_id": {"$regex": re.compile(r"{}".format(search_term))}})
+#     #     .to_list(length=5)
+#     # )
+#     # search_on_index = (
+#     #     await db_to_use[Collections.all_account_addresses]
+#     #     .find(
+#     #         {
+#     #             "$expr": {
+#     #                 "$regexMatch": {
+#     #                     "input": {"$toString": "$account_index"},
+#     #                     "regex": f"{search_term}",
+#     #                 }
+#     #             }
+#     #         }
+#     #     )
+#     #     .to_list(length=5)
+#     # )
+
+#     # search_accounts = search_on_address + search_on_index
+
+#     # search_result["accounts"] = search_accounts
+#     # search_term = str(search_term)[:3]
+#     # Blocks
+#     caret = re.compile(r"{}$".format(search_term))
+#     search_on_blocks = (
+#         await db_to_use[Collections.blocks].find(
+#             {"_id": {"$regex": f"/{caret.pattern}/"}}
+#         )
+#         # .find({"_id": {"$regex": re.compile(r"^{}".format(search_term))}})
+#         .to_list(length=5)
+#     )
+#     search_result["blocks"] = search_on_blocks
+
+#     # # Transactions
+#     # search_on_transactions = (
+#     #     await db_to_use[Collections.transactions]
+#     #     .find({"_id": {"$regex": re.compile(r"{}".format(search_term))}})
+#     #     .to_list(length=5)
+#     # )
+#     # search_result["transactions"] = search_on_transactions
+#     return search_result

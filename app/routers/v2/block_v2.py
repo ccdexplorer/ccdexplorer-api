@@ -16,7 +16,7 @@ from ccdexplorer_fundamentals.mongodb import (
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
-
+import grpc
 from app.state_getters import get_grpcclient, get_mongo_motor
 
 router = APIRouter(tags=["Block"], prefix="/v2")
@@ -37,7 +37,11 @@ async def get_block_at_height_from_grpc(
         height_or_hash = int(height_or_hash)
     except ValueError:
         pass
-    result = grpcclient.get_block_info(height_or_hash, NET(net))
+    try:
+        result = grpcclient.get_block_info(height_or_hash, NET(net))
+    except grpc._channel._InactiveRpcError:
+        result = None
+
     if result:
         return result
     else:

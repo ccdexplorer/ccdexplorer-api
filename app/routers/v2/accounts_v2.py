@@ -2,6 +2,7 @@ from ccdexplorer_fundamentals.mongodb import (
     Collections,
     MongoMotor,
 )
+from ccdexplorer_fundamentals.node import ConcordiumNodeFromDashboard
 from ccdexplorer_fundamentals.enums import NET
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import (
@@ -218,3 +219,92 @@ async def get_last_accounts(
             status_code=404,
             detail=f"Error retrieving last {count} accounts on {net}, {error}.",
         )
+
+
+@router.get("/{net}/accounts/nodes-validators", response_class=JSONResponse)
+async def get_nodes_and_validators(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """
+    Endpoint to get nodes and validators.
+
+    """
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+
+    all_nodes = (
+        await db_to_use[Collections.dashboard_nodes].find({}).to_list(length=None)
+    )
+    all_nodes_by_node_id = {x["nodeId"]: x for x in all_nodes}
+
+    if net == "mainnet":
+        all_validators = [
+            x
+            for x in await db_to_use[Collections.paydays_current_payday]
+            .find({})
+            .to_list(length=None)
+        ]
+
+        all_validators_by_validator_id = {x["baker_id"]: x for x in all_validators}
+
+        validator_nodes_by_validator_id = {
+            x["consensusBakerId"]: {
+                "node": ConcordiumNodeFromDashboard(**x),
+                "validator": all_validators_by_validator_id[str(x["consensusBakerId"])],
+            }
+            for x in all_nodes
+            if x["consensusBakerId"] is not None
+            if str(x["consensusBakerId"]) in all_validators_by_validator_id.keys()
+        }
+
+        validator_nodes_by_account_id = {
+            all_validators_by_validator_id[str(x["consensusBakerId"])]["pool_status"][
+                "address"
+            ]: {
+                "node": ConcordiumNodeFromDashboard(**x),
+                "validator": all_validators_by_validator_id[str(x["consensusBakerId"])],
+            }
+            for x in all_nodes
+            if x["consensusBakerId"] is not None
+            if str(x["consensusBakerId"]) in all_validators_by_validator_id.keys()
+        }
+
+        non_validator_nodes_by_node_id = {
+            x["nodeId"]: {"node": ConcordiumNodeFromDashboard(**x), "baker": None}
+            for x in all_nodes
+            if x["consensusBakerId"] is None
+        }
+
+        non_reporting_validators_by_validator_id = {
+            x["baker_id"]: {
+                "node": None,
+                "validator": all_validators_by_validator_id[str(x["baker_id"])],
+            }
+            for x in all_validators
+            if x["baker_id"] not in validator_nodes_by_validator_id.keys()
+        }
+
+        non_reporting_validators_by_account_id = {
+            all_validators_by_validator_id[x["baker_id"]]["pool_status"]["address"]: {
+                "node": None,
+                "validator": all_validators_by_validator_id[str(x["baker_id"])],
+            }
+            for x in all_validators
+            if x["baker_id"] not in validator_nodes_by_validator_id.keys()
+        }
+
+    result_dict = {"all_nodes_by_node_id": all_nodes_by_node_id}
+    if net == "mainnet":
+        result_dict.update(
+            {
+                "all_validators_by_validator_id": all_validators_by_validator_id,
+                "validator_nodes_by_account_id": validator_nodes_by_account_id,
+                "non_validator_nodes_by_node_id": non_validator_nodes_by_node_id,
+                "non_reporting_validators_by_validator_id": non_reporting_validators_by_validator_id,
+                "non_reporting_validators_by_account_id": non_reporting_validators_by_account_id,
+            }
+        )
+    return result_dict

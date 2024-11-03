@@ -496,9 +496,7 @@ async def get_nft_tag_tokens(
         )
 
     filter = {"contract": {"$in": tag_result["contracts"]}}
-    sort = list({"_id": 1}.items())
-    skip = 0
-    limit = 10
+    sort = list({"last_height_processed": -1}.items())
     nft_tokens = (
         await db_to_use[Collections.tokens_token_addresses_v2]
         .find(filter=filter, sort=sort, skip=skip, limit=limit)
