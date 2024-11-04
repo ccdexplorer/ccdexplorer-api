@@ -162,6 +162,29 @@ async def get_current_payday_info(
         )
 
 
+@router.get("/{net}/accounts/last-payday-block/info", response_class=JSONResponse)
+async def get_last_payday_info(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """
+    Endpoint to get the last payday block info.
+
+    """
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    result = await db_to_use[Collections.paydays].find_one(sort=[("date", -1)])
+    if result:
+        return result
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail="Error retrieving last payday block info.",
+        )
+
+
 @router.get("/{net}/accounts/last/{count}", response_class=JSONResponse)
 async def get_last_accounts(
     request: Request,
@@ -273,7 +296,7 @@ async def get_nodes_and_validators(
         }
 
         non_validator_nodes_by_node_id = {
-            x["nodeId"]: {"node": ConcordiumNodeFromDashboard(**x), "baker": None}
+            x["nodeId"]: {"node": ConcordiumNodeFromDashboard(**x), "validator": None}
             for x in all_nodes
             if x["consensusBakerId"] is None
         }
