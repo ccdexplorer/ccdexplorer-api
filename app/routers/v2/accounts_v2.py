@@ -200,6 +200,7 @@ async def get_last_accounts(
     """
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     count = min(50, max(count, 1))
+    error = None
     try:
         result = [
             x["account_index"]
@@ -208,7 +209,7 @@ async def get_last_accounts(
             .sort({"account_index": -1})
             .to_list(count)
         ]
-        error = None
+
         accounts = []
         for account_index in result:
             account_info = grpcclient.get_account_info(

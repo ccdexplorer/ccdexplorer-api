@@ -27,6 +27,7 @@ async def get_last_blocks(
     """
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     count = min(50, max(count, 1))
+    error = None
     try:
         result = (
             await db_to_use[Collections.blocks]
@@ -34,7 +35,7 @@ async def get_last_blocks(
             .sort({"height": -1})
             .to_list(count)
         )
-        error = None
+
     except Exception as error:
         print(error)
         result = None
