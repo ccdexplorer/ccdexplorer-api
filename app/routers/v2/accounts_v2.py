@@ -1,13 +1,11 @@
-from ccdexplorer_fundamentals.mongodb import (
-    Collections,
-    MongoMotor,
-)
+from ccdexplorer_fundamentals.mongodb import Collections, MongoMotor, MongoTypePayday
 from ccdexplorer_fundamentals.node import ConcordiumNodeFromDashboard
 from ccdexplorer_fundamentals.enums import NET
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import (
-    CCD_AccountInfo,
     CCD_BlockItemSummary,
+    CCD_DelegatorRewardPeriodInfo,
+    CCD_DelegatorInfo,
 )
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from app.ENV import API_KEY_HEADER
@@ -250,7 +248,6 @@ async def get_nodes_and_validators(
     request: Request,
     net: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
-    grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """
@@ -332,3 +329,121 @@ async def get_nodes_and_validators(
             }
         )
     return result_dict
+
+
+@router.get(
+    "/{net}/accounts/paydays/{skip}/{limit}",
+    response_class=JSONResponse,
+)
+async def get_paydays(
+    request: Request,
+    net: str,
+    skip: int,
+    limit: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> list[MongoTypePayday]:
+    """
+    Endpoint to get paydays.
+    """
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    result = (
+        await db_to_use[Collections.paydays]
+        .find(sort=[("date", -1)])
+        .skip(skip)
+        .limit(limit)
+        .to_list(length=limit)
+    )
+    return result
+
+
+@router.get(
+    "/{net}/accounts/paydays/passive-delegation",
+    response_class=JSONResponse,
+)
+async def get_payday_passive_info(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """
+    Endpoint to get payday passive information.
+    """
+    passive_delegation_info = grpcclient.get_passive_delegation_info("last_final")
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    passive_delegation_apy_object = await db_to_use[
+        Collections.paydays_apy_intermediate
+    ].find_one({"_id": "passive_delegation"})
+
+    passive_delegation_rewards = {
+        "d30": {"sum_of_rewards": 0, "apy": 0},
+        "d90": {"sum_of_rewards": 0, "apy": 0},
+        "d180": {"sum_of_rewards": 0, "apy": 0},
+    }
+    if passive_delegation_apy_object:
+        d30_day = list(passive_delegation_apy_object["d30_apy_dict"].keys())[-1]
+        d90_day = list(passive_delegation_apy_object["d90_apy_dict"].keys())[-1]
+        d180_day = list(passive_delegation_apy_object["d180_apy_dict"].keys())[-1]
+
+        passive_delegation_rewards["d30"] = passive_delegation_apy_object[
+            "d30_apy_dict"
+        ][d30_day]
+        passive_delegation_rewards["d90"] = passive_delegation_apy_object[
+            "d90_apy_dict"
+        ][d90_day]
+        passive_delegation_rewards["d180"] = passive_delegation_apy_object[
+            "d180_apy_dict"
+        ][d180_day]
+
+    return {
+        "passive_delegation_info": passive_delegation_info,
+        "passive_delegation_rewards": passive_delegation_rewards,
+    }
+
+
+@router.get(
+    "/{net}/accounts/paydays/passive-delegators/{skip}/{limit}",
+    response_class=JSONResponse,
+)
+async def get_payday_passive_delegators(
+    request: Request,
+    net: str,
+    skip: int,
+    limit: int,
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """
+    Endpoint to get payday passive delegators.
+    """
+    delegators_current_payday = [
+        x
+        for x in grpcclient.get_delegators_for_passive_delegation_in_reward_period(
+            "last_final"
+        )
+    ]
+    delegators_in_block = [
+        x for x in grpcclient.get_delegators_for_passive_delegation("last_final")
+    ]
+
+    delegators_current_payday_list = set([x.account for x in delegators_current_payday])
+
+    delegators_in_block_list = set([x.account for x in delegators_in_block])
+
+    delegators_current_payday_dict = {x.account: x for x in delegators_current_payday}
+    delegators_in_block_dict = {x.account: x for x in delegators_in_block}
+
+    new_delegators = delegators_in_block_list - delegators_current_payday_list
+
+    # delegators_in_block_list = list(delegators_in_block_list)
+    new_delegators_dict = {x: delegators_in_block_dict[x] for x in new_delegators}
+
+    delegators = sorted(delegators_current_payday, key=lambda x: x.stake, reverse=True)
+    return {
+        "delegators": delegators[skip : (skip + limit)],
+        "delegators_current_payday_dict": delegators_current_payday_dict,
+        "delegators_in_block_dict": delegators_in_block_dict,
+        "new_delegators_dict": new_delegators_dict,
+    }
