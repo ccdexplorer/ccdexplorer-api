@@ -1,4 +1,9 @@
-from ccdexplorer_fundamentals.mongodb import Collections, MongoMotor, MongoTypePayday
+from ccdexplorer_fundamentals.mongodb import (
+    Collections,
+    MongoMotor,
+    MongoTypePayday,
+    MongoTypePaydaysPerformance,
+)
 from ccdexplorer_fundamentals.node import ConcordiumNodeFromDashboard
 from ccdexplorer_fundamentals.enums import NET
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
@@ -329,6 +334,145 @@ async def get_nodes_and_validators(
             }
         )
     return result_dict
+
+
+@router.get("/{net}/accounts/paydays/pools/{status}", response_class=JSONResponse)
+async def get_payday_pools(
+    request: Request,
+    net: str,
+    status: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """
+    Endpoint to get payday pools.
+    """
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    last_payday = MongoTypePayday(
+        **await db_to_use[Collections.paydays].find_one(sort=[("date", -1)])
+    )
+    pools_for_status = last_payday.pool_status_for_bakers[status]
+    result = (
+        await mongomotor.mainnet[Collections.paydays_current_payday]
+        .find()
+        .to_list(100_000)
+    )
+    last_payday_performance = {
+        x["baker_id"]: MongoTypePaydaysPerformance(
+            **x
+        )  # .model_dump(exclude_none=True)
+        for x in result
+        if (
+            (str(x["baker_id"]).isnumeric())
+            and (int(x["baker_id"]) in pools_for_status)
+        )
+    }
+    result = (
+        await mongomotor.mainnet[Collections.paydays_apy_intermediate]
+        .find({"_id": {"$in": list(last_payday_performance.keys())}})
+        .to_list(100_000)
+    )
+    last_payday_apy_objects = {x["_id"]: x for x in result}
+
+    dd = {}
+    for baker_id in last_payday_performance.keys():
+        # print(baker_id)
+        if "d30_apy_dict" in last_payday_apy_objects[baker_id]:
+            if last_payday_apy_objects[baker_id]["d30_apy_dict"] is not None:
+                d30_day = list(
+                    last_payday_apy_objects[baker_id]["d30_apy_dict"].keys()
+                )[-1]
+            else:
+                d30_day = None
+        else:
+            d30_day = None
+
+        if "d90_apy_dict" in last_payday_apy_objects[baker_id]:
+            if last_payday_apy_objects[baker_id]["d90_apy_dict"] is not None:
+                d90_day = list(
+                    last_payday_apy_objects[baker_id]["d90_apy_dict"].keys()
+                )[-1]
+            else:
+                d90_day = None
+        else:
+            d90_day = None
+
+        if "d180_apy_dict" in last_payday_apy_objects[baker_id]:
+            if last_payday_apy_objects[baker_id]["d180_apy_dict"] is not None:
+                d180_day = list(
+                    last_payday_apy_objects[baker_id]["d180_apy_dict"].keys()
+                )[-1]
+            else:
+                d180_day = None
+        else:
+            d180_day = None
+
+        delegated_percentage = (
+            (
+                last_payday_performance[baker_id].pool_status.delegated_capital
+                / last_payday_performance[baker_id].pool_status.delegated_capital_cap
+            )
+            * 100
+            if last_payday_performance[baker_id].pool_status.delegated_capital_cap > 0
+            else 0
+        )
+
+        delegated_percentage_remaining = 100 - delegated_percentage
+        pie = (
+            f"<style> .pie_{baker_id} {{\n"
+            f"width: 20px;\nheight: 20px;\n"
+            f"background-image: conic-gradient(#AE7CF7 0%, #AE7CF7 {delegated_percentage}%, #70B785 0%, #70B785 {delegated_percentage_remaining}%);\n"
+            f" border-radius: 50%\n"
+            f"}}\n</style>\n"
+        )
+
+        d = {
+            "baker_id": baker_id,
+            "block_commission_rate": last_payday_performance[
+                baker_id
+            ].pool_status.pool_info.commission_rates.baking,
+            "tx_commission_rate": last_payday_performance[
+                baker_id
+            ].pool_status.pool_info.commission_rates.transaction,
+            "expectation": last_payday_performance[baker_id].expectation,
+            "lottery_power": last_payday_performance[
+                baker_id
+            ].pool_status.current_payday_info.lottery_power,
+            "url": last_payday_performance[baker_id].pool_status.pool_info.url,
+            "effective_stake": last_payday_performance[
+                baker_id
+            ].pool_status.current_payday_info.effective_stake,
+            "delegated_capital": last_payday_performance[
+                baker_id
+            ].pool_status.delegated_capital,
+            "delegated_capital_cap": last_payday_performance[
+                baker_id
+            ].pool_status.delegated_capital_cap,
+            "baker_equity_capital": last_payday_performance[
+                baker_id
+            ].pool_status.current_payday_info.baker_equity_capital,
+            "delegated_percentage": delegated_percentage,
+            "delegated_percentage_remaining": delegated_percentage_remaining,
+            "pie": pie,
+            "d30": (
+                last_payday_apy_objects[baker_id].get("d30_apy_dict")[d30_day]
+                if d30_day
+                else {"apy": 0.0, "sum_of_rewards": 0, "count_of_days": 0}
+            ),
+            "d90": (
+                last_payday_apy_objects[baker_id].get("d90_apy_dict")[d90_day]
+                if d90_day
+                else {"apy": 0.0, "sum_of_rewards": 0, "count_of_days": 0}
+            ),
+            "d180": (
+                last_payday_apy_objects[baker_id].get("d180_apy_dict")[d180_day]
+                if d180_day
+                else {"apy": 0.0, "sum_of_rewards": 0, "count_of_days": 0}
+            ),
+        }
+        dd[baker_id] = d
+
+    return dd
 
 
 @router.get(
