@@ -11,7 +11,6 @@ from ccdexplorer_fundamentals.mongodb import (
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
-import re
 from app.state_getters import get_grpcclient, get_mongo_motor
 
 router = APIRouter(tags=["Misc"], prefix="/v2")
@@ -118,7 +117,7 @@ async def get_labeled_accounts(
     """
 
     # labeled accounts only exist for mainnet
-    db_to_use = mongomotor.mainnet
+    # db_to_use = mongomotor.mainnet
     db_utilities = mongomotor.utilities
 
     result = (

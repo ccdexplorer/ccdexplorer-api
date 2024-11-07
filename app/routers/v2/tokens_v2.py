@@ -73,9 +73,17 @@ async def get_fungible_tokens_verified(
     Endpoint to get verified fungible tokens on 'net'.
     """
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    pipeline = [
+        {
+            "$match": {
+                "token_type": "fungible",
+                "$or": [{"hidden": {"$exists": False}}, {"hidden": False}],
+            }
+        }
+    ]
     fungible_tokens = (
         await db_to_use[Collections.tokens_tags]
-        .find({"token_type": "fungible"})
+        .aggregate(pipeline)
         .to_list(length=None)
     )
 
@@ -127,9 +135,17 @@ async def get_non_fungible_tokens_verified(
     Endpoint to get verified non-fungible tokens on 'net'.
     """
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    pipeline = [
+        {
+            "$match": {
+                "token_type": "non-fungible",
+                "$or": [{"hidden": {"$exists": False}}, {"hidden": False}],
+            }
+        }
+    ]
     non_fungible_tokens = (
         await db_to_use[Collections.tokens_tags]
-        .find({"token_type": "non-fungible"})
+        .aggregate(pipeline)
         .to_list(length=None)
     )
 

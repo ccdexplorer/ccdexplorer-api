@@ -7,11 +7,7 @@ from ccdexplorer_fundamentals.mongodb import (
 from ccdexplorer_fundamentals.node import ConcordiumNodeFromDashboard
 from ccdexplorer_fundamentals.enums import NET
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
-from ccdexplorer_fundamentals.GRPCClient.CCD_Types import (
-    CCD_BlockItemSummary,
-    CCD_DelegatorRewardPeriodInfo,
-    CCD_DelegatorInfo,
-)
+from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_BlockItemSummary
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
