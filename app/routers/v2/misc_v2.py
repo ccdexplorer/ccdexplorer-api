@@ -444,6 +444,27 @@ async def get_project_addresses(
     return project_addresses
 
 
+@router.get(
+    "/misc/release-notes",
+    response_class=JSONResponse,
+)
+async def get_release_notes(
+    request: Request,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+    db_to_use = mongomotor.utilities
+    release_notes = list(
+        reversed(
+            await db_to_use[CollectionsUtilities.release_notes]
+            .find({})
+            .to_list(length=None)
+        )
+    )
+
+    return release_notes
+
+
 # @router.get("/{net}/misc/search/{search_term}", response_class=JSONResponse)
 # async def get_accounts_search(
 #     request: Request,
