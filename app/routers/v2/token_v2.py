@@ -341,6 +341,45 @@ async def get_token_current_holders(
 
 
 @router.get(
+    "/{net}/token/{contract_index}/{contract_subindex}/{token_id}/cis-2-compliant",
+    response_class=JSONResponse,
+)
+async def get_token_cis_2_compliance(
+    request: Request,
+    net: str,
+    contract_index: int,
+    contract_subindex: int,
+    token_id: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> bool:
+    """
+    Endpoint to get determination if all holder have zero of positive balance.
+    """
+    token_id = "" if token_id == "_" else token_id
+    token_address = f"<{contract_index},{contract_subindex}>-{token_id}"
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    compliant_contract = True
+    try:
+        pipeline = [
+            {"$match": {"token_holding.token_address": token_address}},
+            {"$match": {"token_holding.token_amount": {"$regex": "-"}}},
+            {"$limit": 1},
+        ]
+        result = (
+            await db_to_use[Collections.tokens_links_v2]
+            .aggregate(pipeline)
+            .to_list(length=1)
+        )
+        compliant_contract = len(result) == 0
+
+    except Exception as _:
+        pass
+
+    return compliant_contract
+
+
+@router.get(
     "/{net}/token/{tag}/info",
     response_class=JSONResponse,
 )

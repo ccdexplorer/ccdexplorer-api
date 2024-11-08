@@ -49,6 +49,7 @@ from app.routers.v2 import (
     transaction_v2,
     transactions_v2,
     module_v2,
+    modules_v2,
     site_user_v2,
 )
 
@@ -182,6 +183,7 @@ app.include_router(markets_v2.router)
 app.include_router(contract_v2.router)
 app.include_router(misc_v2.router)
 app.include_router(module_v2.router)
+app.include_router(modules_v2.router)
 
 # auth, content, key management
 app.include_router(auth.router)
