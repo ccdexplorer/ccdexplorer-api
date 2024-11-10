@@ -244,6 +244,7 @@ async def get_community_labeled_accounts(
         colors[r["_id"]] = r.get("color")
         descriptions[r["_id"]] = r.get("description")
 
+    del labeled_accounts["projects"]
     tags = {
         "labels_melt": labels_melt,
         "labeled_accounts": labeled_accounts,
