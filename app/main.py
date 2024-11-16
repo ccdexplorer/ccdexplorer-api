@@ -73,6 +73,15 @@ from redis.asyncio import StrictRedis
 
 from app.ratelimiting import AUTH_FUNCTION, handle_429, handle_auth_error
 
+import sentry_sdk
+
+if environment["SITE_URL"] != "http://127.0.0.1:8000":
+    sentry_sdk.init(
+        dsn=environment["SENTRY_DSN"],
+        traces_sample_rate=1.0,
+        _experiments={"continuous_profiling_auto_start": True},
+    )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
