@@ -289,7 +289,13 @@ async def get_account_fungible_tokens_verified(
     """
     Endpoint to get verified fungible tokens for a given account, as stored in MongoDB collection `tokens_links_v2`.
     """
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    if net == "testnet":
+        raise HTTPException(
+            status_code=404,
+            detail=f"Fungible verified tokens are not tracked on {net}",
+        )
+
+    db_to_use = mongomotor.mainnet
     fungible_token_addresses = [
         x["related_token_address"]
         for x in await db_to_use[Collections.tokens_tags]
