@@ -88,10 +88,12 @@ async def get_token_based_on_token_id(
 
     if tag_result:
         if not token_id:
-            pipeline = [
-                {"$match": {"_id": tag_result["related_token_address"]}},
-                {"$limit": 1},
-            ]
+            if "related_token_address" in tag_result:
+                pipeline = [{"$match": {"_id": tag_result["related_token_address"]}}]
+            else:
+                pipeline = [{"$match": {"contract": tag_result["contracts"][0]}}]
+
+            pipeline.append({"$limit": 1})
         else:
             pipeline = [
                 {"$match": {"contract": {"$in": tag_result["contracts"]}}},
