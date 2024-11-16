@@ -168,8 +168,8 @@ async def get_instance_CIS_support(
     """
     Endpoint to get CIS support for instance.
     """
-    if isinstance(net, NET):
-        net_to_use = net
+    if "." in net:
+        net_to_use = NET(net.split(".")[1].lower())
     else:
         net_to_use = NET(net)
 
@@ -194,7 +194,7 @@ async def get_instance_CIS_support(
     else:
         raise HTTPException(
             status_code=404,
-            detail=f"Requested smart contract '<{contract_index},{contract_subindex}>' not found on {net}.",
+            detail=f"Requested smart contract '<{contract_index},{contract_subindex}>' not found on {net_to_use.value}.",
         )
 
 
