@@ -57,18 +57,27 @@ async def get_schema_from_source(
         source_module_name = (
             result["v1"]["name"][5:] if result.get("v1") else result["v0"]["name"][5:]
         )
-        ms: VersionedModuleSource = grpcclient.get_module_source_original_classes(
-            module_ref, "last_final", net=NET(net)
-        )
-        version = "v1" if ms.v1 else "v0"
-        module_source = ms.v1.value if ms.v1 else ms.v0.value
-        return JSONResponse(
-            {
-                "source_module_name": source_module_name,
-                "module_source": json.dumps(base64.encodebytes(module_source).decode()),
-                "version": version,
-            }
-        )
+        try:
+            ms: VersionedModuleSource = grpcclient.get_module_source_original_classes(
+                module_ref, "last_final", net=NET(net)
+            )
+
+            version = "v1" if ms.v1 else "v0"
+            module_source = ms.v1.value if ms.v1 else ms.v0.value
+            return JSONResponse(
+                {
+                    "source_module_name": source_module_name,
+                    "module_source": json.dumps(
+                        base64.encodebytes(module_source).decode()
+                    ),
+                    "version": version,
+                }
+            )
+        except Exception as _:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Requested smart contract '<{contract_index},{contract_subindex}>' has no published schema on {net}.",
+            )
     else:
         raise HTTPException(
             status_code=404,
