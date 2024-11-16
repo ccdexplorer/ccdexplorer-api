@@ -1,18 +1,13 @@
-from fastapi import APIRouter, Request, Depends, HTTPException, Security
+from fastapi import APIRouter, Request, Depends, Security
 from app.ENV import API_KEY_HEADER
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
-from ccdexplorer_fundamentals.cis import CIS, MongoTypeTokensTag
-from ccdexplorer_schema_parser.Schema import Schema
-from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_ContractAddress
 from ccdexplorer_fundamentals.GRPCClient.types_pb2 import VersionedModuleSource
 from ccdexplorer_fundamentals.enums import NET
 from ccdexplorer_fundamentals.mongodb import (
     MongoMotor,
     Collections,
 )
-from pydantic import BaseModel
-from pymongo import ReplaceOne
 from app.state_getters import get_mongo_motor, get_grpcclient
 import json
 import base64
@@ -108,7 +103,10 @@ async def get_module_instances(
         await db_to_use[Collections.instances].aggregate(pipeline).to_list(length=None)
     )
     module_instances = [x["_id"] for x in result[0]["data"]]
-    instances_count = result[0]["total"]
+    if "total" in result[0]:
+        instances_count = result[0]["total"]
+    else:
+        instances_count = 0
 
     return {"module_instances": module_instances, "instances_count": instances_count}
 

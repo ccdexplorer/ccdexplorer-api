@@ -78,7 +78,7 @@ import sentry_sdk
 if environment["SITE_URL"] != "http://127.0.0.1:8000":
     sentry_sdk.init(
         dsn=environment["SENTRY_DSN"],
-        environment=environment["API_URL"],
+        # environment=environment["API_URL"],
         traces_sample_rate=1.0,
         _experiments={"continuous_profiling_auto_start": True},
     )
