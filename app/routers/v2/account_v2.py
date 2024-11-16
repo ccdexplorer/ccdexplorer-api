@@ -1050,15 +1050,17 @@ async def get_account_validator_node(
 
     """
     db_to_use = mongomotor.mainnet
-    try:
-        result = await db_to_use[Collections.dashboard_nodes].find_one(
-            {"consensusBakerId": str(index)}
-        )
+
+    result = await db_to_use[Collections.dashboard_nodes].find_one(
+        {"consensusBakerId": str(index)}
+    )
+
+    if result:
         return result
-    except Exception as error:
+    else:
         raise HTTPException(
             status_code=404,
-            detail=f"Can't retrieve account APY data with error {error}.",
+            detail=f"Can't find node for validator {index} on {net}.",
         )
 
 
