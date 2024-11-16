@@ -122,7 +122,8 @@ async def get_token_based_on_token_id(
                     ]
                 }
             )
-            the_token.update({"mint_tx_hash": mint_event_logged_event["tx_hash"]})
+            if mint_event_logged_event:
+                the_token.update({"mint_tx_hash": mint_event_logged_event["tx_hash"]})
 
             pipeline = [
                 {"$match": {"token_holding.token_address": the_token["_id"]}},
