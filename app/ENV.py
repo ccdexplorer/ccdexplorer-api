@@ -19,6 +19,7 @@ API_ACCOUNT_MAINNET = "3GjqwYXv5sGY1QZdhx3uBdNz1LWUofQAn4tyV6wQu8cg9592Ur"
 # set this to have the api look out for payments on the chosen net.
 API_NET = os.environ.get("API_NET", "mainnet")
 SENTRY_DSN = os.environ.get("SENTRY_DSN")
+SENTRY_ENVIRONMENT = os.environ.get("SENTRY_ENVIRONMENT")
 
 environment = {
     "SITE_URL": SITE_URL,
@@ -27,7 +28,7 @@ environment = {
     "API_ACCOUNT_MAINNET": API_ACCOUNT_MAINNET,
     "API_NET": API_NET,
     "API_URL": API_URL,
-    "SENTRY_ENVIRONMENT": SITE_URL,
+    "SENTRY_ENVIRONMENT": SENTRY_ENVIRONMENT,
     "REDIS_URL": REDIS_URL,
     "SENTRY_DSN": SENTRY_DSN,
 }
