@@ -395,10 +395,10 @@ async def get_info_for_token_tag(
     Endpoint to get information for a given token tag.
     """
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
-    token_tag = MongoTypeTokensTag(
-        **db_to_use[Collections.tokens_tags].find_one({"_id": tag})
-    )
-    if token_tag:
+    result = db_to_use[Collections.tokens_tags].find_one({"_id": tag})
+    if result:
+        token_tag = MongoTypeTokensTag(**result)
+    if result:
         return token_tag
     else:
         raise HTTPException(

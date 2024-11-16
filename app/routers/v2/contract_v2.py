@@ -168,6 +168,11 @@ async def get_instance_CIS_support(
     """
     Endpoint to get CIS support for instance.
     """
+    if isinstance(net, NET):
+        net_to_use = net
+    else:
+        net_to_use = NET(net)
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     instance_address = f"<{contract_index},{contract_subindex}>"
     result = await db_to_use[Collections.instances].find_one({"_id": instance_address})
@@ -181,7 +186,7 @@ async def get_instance_CIS_support(
             contract_index,
             contract_subindex,
             f"{module_name}.supports",
-            NET(net),
+            net_to_use,
         )
         supports_cis_standard = cis.supports_standard(StandardIdentifiers(cis_standard))
 
