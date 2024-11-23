@@ -735,7 +735,10 @@ async def get_validator_current_payday_stats(
                 pool.current_payday_info.blocks_baked,
             )
         except grpc._channel._InactiveRpcError:
-            pass
+            raise HTTPException(
+                status_code=404,
+                detail=f"Can't get earliest win time for account {index} on {net}",
+            )
 
         if stats:
             return stats

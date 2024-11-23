@@ -85,7 +85,13 @@ async def get_identity_providers(
     """
 
     identity_providers = {}
-    tmp = grpcclient.get_identity_providers("last_final", NET(net))
+    try:
+        tmp = grpcclient.get_identity_providers("last_final", NET(net))
+    except:  # noqa: E722
+        raise HTTPException(
+            status_code=404,
+            detail=f"Error getting identity providers on {net}.",
+        )
 
     for id in tmp:
         identity_providers[id.identity] = {

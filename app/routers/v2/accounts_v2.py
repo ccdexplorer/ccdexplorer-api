@@ -231,13 +231,14 @@ async def get_last_accounts(
                 result = None
             accounts.append({"account_info": account_info, "deployment_tx": result})
 
-    except Exception as error:
+    except Exception as error:  # noqa: F811
         print(error)
         result = None
 
     if result:
         return accounts
     else:
+        error = None
         raise HTTPException(
             status_code=404,
             detail=f"Error retrieving last {count} accounts on {net}, {error}.",
