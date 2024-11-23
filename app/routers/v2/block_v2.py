@@ -41,6 +41,8 @@ async def get_block_at_height_from_grpc(
         result = grpcclient.get_block_info(height_or_hash, NET(net))
     except grpc._channel._InactiveRpcError:
         result = None
+    except ValueError:
+        result = None
 
     if result:
         return result
