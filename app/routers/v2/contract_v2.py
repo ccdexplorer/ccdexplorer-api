@@ -22,6 +22,15 @@ from app.state_getters import get_grpcclient, get_mongo_motor
 router = APIRouter(tags=["Contract"], prefix="/v2")
 
 
+async def find_cis_standards_support(cis: CIS) -> list[StandardIdentifiers]:
+    # This lists all Standards that are said to be supported
+    standards_supported = []
+    for standard in reversed(StandardIdentifiers):
+        if cis.supports_standards([standard]):
+            standards_supported.append(standard)
+    return standards_supported
+
+
 @router.get(
     "/{net}/contract/{contract_index}/{contract_subindex}/schema-from-source",
     response_class=JSONResponse,
@@ -191,6 +200,52 @@ async def get_instance_CIS_support(
         supports_cis_standard = cis.supports_standard(StandardIdentifiers(cis_standard))
 
         return supports_cis_standard
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested smart contract '<{contract_index},{contract_subindex}>' not found on {net_to_use.value}.",
+        )
+
+
+@router.get(
+    "/{net}/contract/{contract_index}/{contract_subindex}/supports-cis-standards",
+    response_class=JSONResponse,
+)
+async def get_instance_CIS_support_multiple(
+    request: Request,
+    net: str,
+    contract_index: int,
+    contract_subindex: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
+) -> list[str]:
+    """
+    Endpoint to get which CIS standard the instance reportedly supports.
+    """
+    if "." in net:
+        net_to_use = NET(net.split(".")[1].lower())
+    else:
+        net_to_use = NET(net)
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    instance_address = f"<{contract_index},{contract_subindex}>"
+    result = await db_to_use[Collections.instances].find_one({"_id": instance_address})
+    if result:
+        if result.get("v0"):
+            module_name = result["v0"]["name"][5:]
+        if result.get("v1"):
+            module_name = result["v1"]["name"][5:]
+        cis: CIS = CIS(
+            grpcclient,
+            contract_index,
+            contract_subindex,
+            f"{module_name}.supports",
+            net_to_use,
+        )
+        supports_cis_standards = await find_cis_standards_support(cis)
+        supports_cis_standards = [x.value for x in supports_cis_standards]
+        return supports_cis_standards
     else:
         raise HTTPException(
             status_code=404,
