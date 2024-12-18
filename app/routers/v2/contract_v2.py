@@ -70,7 +70,9 @@ async def get_balance_of(req: GetBalanceOfRequest):
 
 
 async def find_cis_standards_support(cis: CIS) -> list[StandardIdentifiers]:
-    # This lists all Standards that are said to be supported
+    """
+    This lists all Standards that are said to be supported.
+    """
     standards_supported = []
     for standard in reversed(StandardIdentifiers):
         if cis.supports_standards([standard]):
