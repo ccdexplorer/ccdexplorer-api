@@ -15,7 +15,12 @@ from pymongo import ReplaceOne
 from app.state_getters import get_mongo_db, get_grpcclient, get_mongo_motor
 from json import dumps, loads
 from typing import Optional
-
+from app.routers.v2.contract_v2 import (
+    get_balance_of,
+    GetBalanceOfRequest,
+    get_module_name_from_contract_address,
+)
+from app.utils import TokenHolding
 from datetime import date, datetime
 
 
@@ -285,6 +290,7 @@ async def get_token_current_holders(
     skip: int,
     limit: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """
@@ -296,19 +302,21 @@ async def get_token_current_holders(
     try:
         pipeline = [
             {"$match": {"token_holding.token_address": token_address}},
-            {
-                "$addFields": {
-                    "token_holding.token_amount_numeric": {
-                        "$toDouble": "$token_holding.token_amount"
-                    }
-                }
-            },
-            # Sort by the numeric version of token_holding.token_amount
-            {"$sort": {"token_holding.token_amount_numeric": -1}},
+            # {
+            #     "$addFields": {
+            #         "token_holding.token_amount_numeric": {
+            #             "$toDouble": "$token_holding.token_amount"
+            #         }
+            #     }
+            # },
+            # # Sort by the numeric version of token_holding.token_amount
+            # {"$sort": {"token_holding.token_amount_numeric": -1}},
             {
                 "$facet": {
                     "metadata": [{"$count": "total"}],
-                    "data": [{"$skip": skip}, {"$limit": limit}],
+                    "data": [
+                        {"$skip": 0},
+                    ],
                 }
             },
             {
@@ -334,8 +342,36 @@ async def get_token_current_holders(
         result = None
 
     if result is not None:
+        addresses = [x["account_address"] for x in current_holders]
+        contract = CCD_ContractAddress.from_index(contract_index, contract_subindex)
+        module_name = await get_module_name_from_contract_address(db_to_use, contract)
+        request = GetBalanceOfRequest(
+            net=net,
+            contract_address=contract,
+            token_id=token_id,
+            module_name=module_name,
+            addresses=addresses,
+            grpcclient=grpcclient,
+        )
+        token_amounts_from_state = await get_balance_of(request)
 
-        return {"current_holders": current_holders, "total_count": total_count}
+        for holder in current_holders:
+            token_holding = TokenHolding(**holder["token_holding"])
+
+            token_holding.token_amount = token_amounts_from_state[
+                holder["account_address"]
+            ]
+            holder["token_holding"] = token_holding
+        sorted_data = sorted(
+            current_holders,
+            reverse=True,
+            key=lambda x: int(x["token_holding"].token_amount),
+        )
+
+        return {
+            "current_holders": sorted_data[skip : (skip + limit)],
+            "total_count": total_count,
+        }
     else:
         raise HTTPException(
             status_code=404,

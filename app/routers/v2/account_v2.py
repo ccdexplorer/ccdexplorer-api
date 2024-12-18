@@ -1,12 +1,13 @@
 import grpc
 from pymongo.collection import Collection
 from ccdexplorer_fundamentals.enums import NET
-from ccdexplorer_fundamentals.cis import MongoTypeLoggedEvent
+from ccdexplorer_fundamentals.cis import MongoTypeLoggedEvent, CIS
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import (
     CCD_AccountInfo,
     CCD_PoolInfo,
     CCD_BlockItemSummary,
+    CCD_ContractAddress,
 )
 import dateutil
 from typing import Optional
@@ -33,19 +34,12 @@ from app.state_getters import (
     get_exchange_rates,
     get_blocks_per_day,
 )
-
-
-class TokenHolding(BaseModel):
-    token_address: str
-    contract: str
-    token_id: str
-    token_amount: str
-    decimals: Optional[int] = None
-    token_symbol: Optional[str] = None
-    token_value: Optional[float] = None
-    token_value_USD: Optional[float] = None
-    verified_information: Optional[dict] = None
-    address_information: Optional[dict] = None
+from app.routers.v2.contract_v2 import (
+    get_balance_of,
+    GetBalanceOfRequest,
+    get_module_name_from_contract_address,
+)
+from app.utils import TokenHolding
 
 
 router = APIRouter(tags=["Account"], prefix="/v2")
@@ -154,6 +148,7 @@ async def get_account_fungible_tokens_value_in_USD(
     net: str,
     account_address: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> float:
@@ -186,6 +181,27 @@ async def get_account_fungible_tokens_value_in_USD(
     )
 
     tokens = [TokenHolding(**x["token_holding"]) for x in result_list]
+
+    # use grpc balance_of method
+    for token in tokens:
+        result = await db_to_use[Collections.tokens_tags].find_one(
+            {"related_token_address": token.token_address}
+        )
+        contract = result["contracts"][0]
+        request = GetBalanceOfRequest(
+            net=net,
+            contract_address=CCD_ContractAddress.from_str(contract),
+            token_id=(
+                ""
+                if result["related_token_address"].replace(contract, "") == "-"
+                else result["related_token_address"].replace(f"{contract}-", "")
+            ),
+            module_name=result["module_name"],
+            addresses=[account_address],
+            grpcclient=grpcclient,
+        )
+        token_amount_from_state = await get_balance_of(request)
+        token.token_amount = token_amount_from_state[account_address]
 
     if len(tokens) > 0:
         tokens_value_USD = await convert_account_fungible_tokens_value_to_USD(
@@ -283,6 +299,7 @@ async def get_account_fungible_tokens_verified(
     skip: int,
     limit: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
@@ -338,6 +355,22 @@ async def get_account_fungible_tokens_verified(
             {"related_token_address": token.token_address}
         )
         token.verified_information = result
+
+        contract = result["contracts"][0]
+        request = GetBalanceOfRequest(
+            net=net,
+            contract_address=CCD_ContractAddress.from_str(contract),
+            token_id=(
+                ""
+                if result["related_token_address"].replace(contract, "") == "-"
+                else result["related_token_address"].replace(f"{contract}-", "")
+            ),
+            module_name=result["module_name"],
+            addresses=[account_address],
+            grpcclient=grpcclient,
+        )
+        token_amount_from_state = await get_balance_of(request)
+        token.token_amount = token_amount_from_state[account_address]
         token.token_symbol = token.verified_information["get_price_from"]
         token.decimals = token.verified_information["decimals"]
         token.token_value = int(token.token_amount) * (math.pow(10, -token.decimals))
@@ -346,7 +379,7 @@ async def get_account_fungible_tokens_verified(
                 token.token_value * exchange_rates[token.token_symbol]["rate"]
             )
         else:
-            token.token_value_USD = 1
+            token.token_value_USD = 0
 
         result = await db_to_use[Collections.tokens_token_addresses_v2].find_one(
             {"_id": token.token_address}
@@ -374,6 +407,7 @@ async def get_account_non_fungible_tokens_verified(
     skip: int,
     limit: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
@@ -426,6 +460,16 @@ async def get_account_non_fungible_tokens_verified(
         )
         token.verified_information = result
 
+        request = GetBalanceOfRequest(
+            net=net,
+            contract_address=CCD_ContractAddress.from_str(token.contract),
+            token_id=token.token_id,
+            module_name=result["module_name"],
+            addresses=[account_address],
+            grpcclient=grpcclient,
+        )
+        token_amount_from_state = await get_balance_of(request)
+        token.token_amount = token_amount_from_state[account_address]
         result = await db_to_use[Collections.tokens_token_addresses_v2].find_one(
             {"_id": token.token_address}
         )
@@ -452,6 +496,7 @@ async def get_account_tokens_unverified(
     skip: int,
     limit: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
@@ -503,6 +548,21 @@ async def get_account_tokens_unverified(
         )
         token.address_information = result
 
+        module_name = await get_module_name_from_contract_address(
+            db_to_use, CCD_ContractAddress.from_str(token.contract)
+        )
+
+        request = GetBalanceOfRequest(
+            net=net,
+            contract_address=CCD_ContractAddress.from_str(token.contract),
+            token_id=token.token_id,
+            module_name=module_name,
+            addresses=[account_address],
+            grpcclient=grpcclient,
+        )
+        token_amount_from_state = await get_balance_of(request)
+        if token_amount_from_state != []:
+            token.token_amount = token_amount_from_state[account_address]
     if len(tokens) > 0:
 
         return {"tokens": tokens, "total_token_count": total_token_count}

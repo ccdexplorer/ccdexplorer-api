@@ -16,10 +16,57 @@ from fastapi.responses import JSONResponse
 import json
 import base64
 from pymongo import DESCENDING
+from pydantic import BaseModel, ConfigDict
+
 
 from app.state_getters import get_grpcclient, get_mongo_motor
 
 router = APIRouter(tags=["Contract"], prefix="/v2")
+
+
+class GetBalanceOfRequest(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    net: str
+    contract_address: CCD_ContractAddress
+    token_id: str
+    module_name: str
+    addresses: list[str]
+    grpcclient: GRPCClient
+
+
+async def get_module_name_from_contract_address(
+    db_to_use, contract_address: CCD_ContractAddress
+):
+    instance_result = await db_to_use[Collections.instances].find_one(
+        {"_id": contract_address.to_str()}
+    )
+    if "v1" in instance_result:
+        module_name = instance_result["v1"]["name"].replace("init_", "")
+    elif "v0" in instance_result:
+        module_name = instance_result["v1"]["name"].replace("init_", "")
+    return module_name
+
+
+async def get_balance_of(req: GetBalanceOfRequest):
+    """
+    This function allows the api to get the balance for a specified account
+    from the specified contract. This is reading from the internal state of the contract through
+    invoking the balanceOf method on the CIS-2 compatible contract.
+    To make this call, we need the contract, the corresponding module name and token_id.
+    """
+    ci = CIS(
+        req.grpcclient,
+        req.contract_address.index,
+        req.contract_address.subindex,
+        f"{req.module_name}.balanceOf",
+        NET(req.net),
+    )
+    response, ii = ci.balanceOf("last_final", req.token_id, req.addresses)
+
+    if ii.failure.used_energy > 0:
+        return {}
+    else:
+        return {req.addresses[i]: str(response[i]) for i in range(len(req.addresses))}
 
 
 async def find_cis_standards_support(cis: CIS) -> list[StandardIdentifiers]:
