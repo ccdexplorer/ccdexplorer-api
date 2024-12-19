@@ -362,8 +362,29 @@ async def get_token_current_holders(
                 holder["account_address"]
             ]
             holder["token_holding"] = token_holding
+
+        consolidated = {}
+
+        for entry in current_holders:
+            address_canonical = entry["account_address_canonical"]
+            token_holding = entry["token_holding"]
+            token_amount = int(token_holding.token_amount)
+
+            if address_canonical in consolidated:
+                consolidated[address_canonical][
+                    "token_holding"
+                ].token_amount += token_amount
+            else:
+                # Make a deep copy to ensure no mutation of the original entry
+                consolidated[address_canonical] = entry
+                consolidated[address_canonical]["token_holding"].token_amount = int(
+                    consolidated[address_canonical]["token_holding"].token_amount
+                )
+
+        # Convert the consolidated dictionary back to a list
+        de_duped_holders = list(consolidated.values())
         sorted_data = sorted(
-            current_holders,
+            de_duped_holders,
             reverse=True,
             key=lambda x: int(x["token_holding"].token_amount),
         )

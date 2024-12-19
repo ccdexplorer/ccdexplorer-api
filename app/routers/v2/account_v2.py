@@ -349,7 +349,7 @@ async def get_account_fungible_tokens_verified(
     tokens = [TokenHolding(**x["token_holding"]) for x in all_tokens]
 
     # add verified information and metadata and USD value
-    for token in tokens:
+    for index, token in enumerate(tokens):
 
         result = await db_to_use[Collections.tokens_tags].find_one(
             {"related_token_address": token.token_address}
@@ -366,11 +366,13 @@ async def get_account_fungible_tokens_verified(
                 else result["related_token_address"].replace(f"{contract}-", "")
             ),
             module_name=result["module_name"],
-            addresses=[account_address],
+            addresses=[all_tokens[index]["account_address"]],
             grpcclient=grpcclient,
         )
         token_amount_from_state = await get_balance_of(request)
-        token.token_amount = token_amount_from_state[account_address]
+        token.token_amount = token_amount_from_state[
+            all_tokens[index]["account_address"]
+        ]
         token.token_symbol = token.verified_information["get_price_from"]
         token.decimals = token.verified_information["decimals"]
         token.token_value = int(token.token_amount) * (math.pow(10, -token.decimals))
