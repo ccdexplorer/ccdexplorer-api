@@ -191,15 +191,32 @@ async def get_instance_information(
     contract_index: int,
     contract_subindex: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
     Endpoint to get the instance information for a smart contract.
     """
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
-    instance_address = f"<{contract_index},{contract_subindex}>"
-    result = await db_to_use[Collections.instances].find_one({"_id": instance_address})
+    instance_info_grpc = grpcclient.get_instance_info(
+        contract_index,
+        contract_subindex,
+        "last_final",
+        NET(net),
+    )
+    result = instance_info_grpc.model_dump(exclude_none=True)
+    result.update(
+        {
+            "_id": CCD_ContractAddress.from_index(
+                contract_index, contract_subindex
+            ).to_str()
+        }
+    )
+    if result["v0"]["source_module"] == "":
+        del result["v0"]
+    if result["v1"]["source_module"] == "":
+        del result["v1"]
+    # result = await db_to_use[Collections.instances].find_one({"_id": instance_address})
     if result:
         return result
     else:
