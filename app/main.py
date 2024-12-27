@@ -51,6 +51,8 @@ from app.routers.v2 import (
     module_v2,
     modules_v2,
     site_user_v2,
+    smart_wallet_v2,
+    smart_wallets_v2,
 )
 
 grpcclient = GRPCClient()
@@ -193,6 +195,8 @@ app.include_router(contract_v2.router)
 app.include_router(misc_v2.router)
 app.include_router(module_v2.router)
 app.include_router(modules_v2.router)
+app.include_router(smart_wallet_v2.router)
+app.include_router(smart_wallets_v2.router)
 
 # auth, content, key management
 app.include_router(auth.router)
