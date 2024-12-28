@@ -187,21 +187,30 @@ async def get_account_fungible_tokens_value_in_USD(
         result = await db_to_use[Collections.tokens_tags].find_one(
             {"related_token_address": token.token_address}
         )
-        contract = result["contracts"][0]
-        request = GetBalanceOfRequest(
-            net=net,
-            contract_address=CCD_ContractAddress.from_str(contract),
-            token_id=(
-                ""
-                if result["related_token_address"].replace(contract, "") == "-"
-                else result["related_token_address"].replace(f"{contract}-", "")
-            ),
-            module_name=result["module_name"],
-            addresses=[account_address],
-            grpcclient=grpcclient,
-        )
-        token_amount_from_state = await get_balance_of(request)
-        token.token_amount = token_amount_from_state[account_address]
+        if result:
+            if "module_name" not in result:
+                module_name = await get_module_name_from_contract_address(
+                    db_to_use, CCD_ContractAddress.from_str(token.contract)
+                )
+
+            else:
+                module_name = result["module_name"]
+
+            contract = result["contracts"][0]
+            request = GetBalanceOfRequest(
+                net=net,
+                contract_address=CCD_ContractAddress.from_str(contract),
+                token_id=(
+                    ""
+                    if result["related_token_address"].replace(contract, "") == "-"
+                    else result["related_token_address"].replace(f"{contract}-", "")
+                ),
+                module_name=module_name,
+                addresses=[account_address],
+                grpcclient=grpcclient,
+            )
+            token_amount_from_state = await get_balance_of(request)
+            token.token_amount = token_amount_from_state[account_address]
 
     if len(tokens) > 0:
         tokens_value_USD = await convert_account_fungible_tokens_value_to_USD(
@@ -306,18 +315,23 @@ async def get_account_fungible_tokens_verified(
     """
     Endpoint to get verified fungible tokens for a given account, as stored in MongoDB collection `tokens_links_v2`.
     """
-    if net == "testnet":
-        raise HTTPException(
-            status_code=404,
-            detail=f"Fungible verified tokens are not tracked on {net}",
-        )
+    # if net == "testnet":
+    #     raise HTTPException(
+    #         status_code=404,
+    #         detail=f"Fungible verified tokens are not tracked on {net}",
+    #     )
 
-    db_to_use = mongomotor.mainnet
-    fungible_token_addresses = [
-        x["related_token_address"]
-        for x in await db_to_use[Collections.tokens_tags]
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    fungible_token_result = (
+        await db_to_use[Collections.tokens_tags]
         .find({"token_type": "fungible"}, {"related_token_address": 1})
         .to_list(length=None)
+    )
+
+    fungible_token_addresses = [
+        x["related_token_address"]
+        for x in fungible_token_result
+        if "related_token_address" in x
     ]
 
     pipeline = [
@@ -355,6 +369,13 @@ async def get_account_fungible_tokens_verified(
             {"related_token_address": token.token_address}
         )
         token.verified_information = result
+        if "module_name" not in result:
+            module_name = await get_module_name_from_contract_address(
+                db_to_use, CCD_ContractAddress.from_str(token.contract)
+            )
+
+        else:
+            module_name = result["module_name"]
 
         contract = result["contracts"][0]
         request = GetBalanceOfRequest(
@@ -365,7 +386,7 @@ async def get_account_fungible_tokens_verified(
                 if result["related_token_address"].replace(contract, "") == "-"
                 else result["related_token_address"].replace(f"{contract}-", "")
             ),
-            module_name=result["module_name"],
+            module_name=module_name,
             addresses=[all_tokens[index]["account_address"]],
             grpcclient=grpcclient,
         )
@@ -454,19 +475,26 @@ async def get_account_non_fungible_tokens_verified(
         total_token_count = 0
     tokens = [TokenHolding(**x["token_holding"]) for x in all_tokens]
 
-    # add verified information and metadata and USD value
+    # add verified information and metadata
     for token in tokens:
 
         result = await db_to_use[Collections.tokens_tags].find_one(
             {"contracts": {"$in": [token.contract]}}
         )
         token.verified_information = result
+        if "module_name" not in result:
+            module_name = await get_module_name_from_contract_address(
+                db_to_use, CCD_ContractAddress.from_str(token.contract)
+            )
+
+        else:
+            module_name = result["module_name"]
 
         request = GetBalanceOfRequest(
             net=net,
             contract_address=CCD_ContractAddress.from_str(token.contract),
             token_id=token.token_id,
-            module_name=result["module_name"],
+            module_name=module_name,
             addresses=[account_address],
             grpcclient=grpcclient,
         )
