@@ -2,10 +2,14 @@ from ccdexplorer_fundamentals.mongodb import Collections, MongoDB, MongoTypeInst
 from ccdexplorer_fundamentals.cis import CIS
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
 from fastapi import APIRouter, Depends, Request, Security
-from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_ContractAddress
+from ccdexplorer_fundamentals.GRPCClient.CCD_Types import (
+    CCD_ContractAddress,
+    CCD_BlockItemSummary,
+)
 from ccdexplorer_fundamentals.enums import NET
 from fastapi.responses import JSONResponse
-from pymongo import DESCENDING
+from fastapi import HTTPException
+from pymongo import DESCENDING, ASCENDING
 from app.ENV import API_KEY_HEADER
 from app.state_getters import get_mongo_db, get_grpcclient
 
@@ -44,6 +48,106 @@ async def get_all_public_keys_for_smart_wallet_contract(
         )
     )
     return result
+
+
+@router.get(
+    "/{net}/smart-wallet/{wallet_contract_address_index}/{wallet_contract_address_subindex}/public-key/{public_key}/deployed",
+    response_class=JSONResponse,
+)
+async def get_deployed_tx_for_public_key_from_smart_wallet_contract(
+    request: Request,
+    net: str,
+    wallet_contract_address_index: int,
+    wallet_contract_address_subindex: int,
+    public_key: str,
+    mongodb: MongoDB = Depends(get_mongo_db),
+    api_key: str = Security(API_KEY_HEADER),
+) -> CCD_BlockItemSummary:
+    """ """
+    wallet_contract_address = CCD_ContractAddress.from_index(
+        wallet_contract_address_index, wallet_contract_address_subindex
+    ).to_str()
+    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+
+    pipeline = [
+        {
+            "$match": {
+                "$or": [
+                    {"to_address_canonical": public_key},
+                    {"from_address_canonical": public_key},
+                ]
+            },
+        },
+        {"$match": {"event_info.contract": wallet_contract_address}},
+        {"$sort": {"tx_info.block_height": ASCENDING}},
+        {"$limit": 1},
+    ]
+    result = list(db_to_use[Collections.tokens_logged_events_v2].aggregate(pipeline))
+    if len(result) > 0:
+        deployment_logged_event = result[0]
+        deployment_tx_hash = deployment_logged_event["tx_info"]["tx_hash"]
+        result = db_to_use[Collections.transactions].find_one(deployment_tx_hash)
+        if result:
+            result = CCD_BlockItemSummary(**result)
+            return result
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail=f"For requested public key {public_key} for smart wallet {wallet_contract_address_index} on {net}, can't find the deployment tx {deployment_tx_hash}.",
+            )
+
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested public key {public_key} for smart wallet {wallet_contract_address_index} on {net} not found.",
+        )
+
+
+@router.get(
+    "/{net}/smart-wallet/{wallet_contract_address_index}/{wallet_contract_address_subindex}/public-key/{public_key}/transaction-count",
+    response_class=JSONResponse,
+)
+async def get_tx_count_for_public_key_from_smart_wallet_contract(
+    request: Request,
+    net: str,
+    wallet_contract_address_index: int,
+    wallet_contract_address_subindex: int,
+    public_key: str,
+    mongodb: MongoDB = Depends(get_mongo_db),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """ """
+    wallet_contract_address = CCD_ContractAddress.from_index(
+        wallet_contract_address_index, wallet_contract_address_subindex
+    ).to_str()
+    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+
+    pipeline = [
+        {
+            "$match": {
+                "$or": [
+                    {"to_address_canonical": public_key},
+                    {"from_address_canonical": public_key},
+                ]
+            },
+        },
+        {"$match": {"event_info.contract": wallet_contract_address}},
+        {"$group": {"_id": "$tx_info.tx_hash"}},
+        {"$count": "tx_count"},
+    ]
+    result = list(db_to_use[Collections.tokens_logged_events_v2].aggregate(pipeline))
+    tx_count = result[0]["tx_count"] if len(result) > 0 else 0
+    if tx_count > 0:
+        return {
+            "public_key": public_key,
+            "contract": wallet_contract_address,
+            "tx_count": tx_count,
+        }
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No transactions found for requested public key {public_key} for smart wallet {wallet_contract_address_index} on {net}.",
+        )
 
 
 @router.get(
