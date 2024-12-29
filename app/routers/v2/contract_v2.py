@@ -34,6 +34,17 @@ class GetBalanceOfRequest(BaseModel):
     grpcclient: GRPCClient
 
 
+class GetCIS5BalanceOfRequest(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    net: str
+    wallet_contract_address: CCD_ContractAddress
+    cis2_contract_address: CCD_ContractAddress
+    token_id: str
+    module_name: str
+    public_keys: list[str]
+    grpcclient: GRPCClient
+
+
 async def get_module_name_from_contract_address(
     db_to_use, contract_address: CCD_ContractAddress
 ):
@@ -67,6 +78,32 @@ async def get_balance_of(req: GetBalanceOfRequest):
         return {}
     else:
         return {req.addresses[i]: str(response[i]) for i in range(len(req.addresses))}
+
+
+async def get_cis5_balance_of(req: GetCIS5BalanceOfRequest):
+    """
+    This function allows the api to get the balance for a specified account
+    from the specified contract. This is reading from the internal state of the contract through
+    invoking the balanceOf method on the CIS-2 compatible contract.
+    To make this call, we need the contract, the corresponding module name and token_id.
+    """
+    ci = CIS(
+        req.grpcclient,
+        req.wallet_contract_address.index,
+        req.wallet_contract_address.subindex,
+        f"{req.module_name}.cis2BalanceOf",
+        NET(req.net),
+    )
+    response, ii = ci.CIS2balanceOf(
+        "last_final", req.cis2_contract_address, req.token_id, req.public_keys
+    )
+
+    if ii.failure.used_energy > 0:
+        return {}
+    else:
+        return {
+            req.public_keys[i]: str(response[i]) for i in range(len(req.public_keys))
+        }
 
 
 async def find_cis_standards_support(cis: CIS) -> list[StandardIdentifiers]:
