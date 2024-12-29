@@ -210,7 +210,7 @@ async def get_account_fungible_tokens_value_in_USD(
                 grpcclient=grpcclient,
             )
             token_amount_from_state = await get_balance_of(request)
-            token.token_amount = token_amount_from_state[account_address]
+            token.token_amount = token_amount_from_state.get(account_address, 0)
 
     if len(tokens) > 0:
         tokens_value_USD = await convert_account_fungible_tokens_value_to_USD(
@@ -391,9 +391,10 @@ async def get_account_fungible_tokens_verified(
             grpcclient=grpcclient,
         )
         token_amount_from_state = await get_balance_of(request)
-        token.token_amount = token_amount_from_state[
-            all_tokens[index]["account_address"]
-        ]
+        token.token_amount = token_amount_from_state.get(
+            all_tokens[index]["account_address"], 0
+        )
+
         token.token_symbol = token.verified_information["get_price_from"]
         token.decimals = token.verified_information["decimals"]
         token.token_value = int(token.token_amount) * (math.pow(10, -token.decimals))
@@ -499,7 +500,7 @@ async def get_account_non_fungible_tokens_verified(
             grpcclient=grpcclient,
         )
         token_amount_from_state = await get_balance_of(request)
-        token.token_amount = token_amount_from_state[account_address]
+        token.token_amount = token_amount_from_state.get(account_address, 0)
         result = await db_to_use[Collections.tokens_token_addresses_v2].find_one(
             {"_id": token.token_address}
         )
@@ -592,7 +593,7 @@ async def get_account_tokens_unverified(
         )
         token_amount_from_state = await get_balance_of(request)
         if token_amount_from_state != []:
-            token.token_amount = token_amount_from_state[account_address]
+            token.token_amount = token_amount_from_state.get(account_address, 0)
     if len(tokens) > 0:
 
         return {"tokens": tokens, "total_token_count": total_token_count}
