@@ -13,6 +13,7 @@ from ccdexplorer_fundamentals.mongodb import (
     MongoMotor,
     MongoTypeInstance,
 )
+
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
@@ -61,7 +62,7 @@ router = APIRouter(tags=["Smart Wallet"], prefix="/v2")
     "/{net}/smart-wallet/{wallet_contract_address_index}/{wallet_contract_address_subindex}/public-keys",
     response_class=JSONResponse,
 )
-async def get_all_public_keys_for_smart_wallet_contract(
+async def get_smart_wallet_details_from_public_key(
     request: Request,
     net: str,
     wallet_contract_address_index: int,
@@ -89,6 +90,34 @@ async def get_all_public_keys_for_smart_wallet_contract(
         )
     )
     return result
+
+
+@router.get(
+    "/{net}/smart-wallet/public-key/{public_key}",
+    response_class=JSONResponse,
+)
+async def get_all_public_keys_for_smart_wallet_contract(
+    request: Request,
+    net: str,
+    public_key: str,
+    mongodb: MongoDB = Depends(get_mongo_db),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """ """
+    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    result = db_to_use[Collections.cis5_public_keys_contracts].find_one(
+        {"address_or_public_key": public_key}
+    )
+    if result:
+        return {
+            "wallet_contract_address": result["wallet_contract_address"],
+            "public_key": public_key,
+        }
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested public key {public_key} on {net} not found.",
+        )
 
 
 @router.get(
