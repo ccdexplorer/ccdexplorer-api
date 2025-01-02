@@ -62,7 +62,7 @@ router = APIRouter(tags=["Smart Wallet"], prefix="/v2")
     "/{net}/smart-wallet/{wallet_contract_address_index}/{wallet_contract_address_subindex}/public-keys",
     response_class=JSONResponse,
 )
-async def get_smart_wallet_details_from_public_key(
+async def get_all_public_keys_for_smart_wallet_contract(
     request: Request,
     net: str,
     wallet_contract_address_index: int,
@@ -96,7 +96,7 @@ async def get_smart_wallet_details_from_public_key(
     "/{net}/smart-wallet/public-key/{public_key}",
     response_class=JSONResponse,
 )
-async def get_all_public_keys_for_smart_wallet_contract(
+async def get_smart_wallet_details_from_public_key(
     request: Request,
     net: str,
     public_key: str,

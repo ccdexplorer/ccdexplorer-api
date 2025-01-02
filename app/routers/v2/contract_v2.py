@@ -486,12 +486,12 @@ async def get_contract_tokens_available(
 ) -> bool:
     """
     Endpoint to determine if a given contract instance holds tokens,
-    as stored in MongoDB collection `tokens_links_v2`.
+    as stored in MongoDB collection `tokens_links_v3`.
     """
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     instance_address = f"<{contract_index},{contract_subindex}>"
     result_list = list(
-        await db_to_use[Collections.tokens_links_v2]
+        await db_to_use[Collections.tokens_links_v3]
         .find({"account_address_canonical": instance_address})
         .to_list(length=1)
     )

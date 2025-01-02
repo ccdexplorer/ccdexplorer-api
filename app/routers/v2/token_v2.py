@@ -146,7 +146,7 @@ async def get_token_based_on_token_id(
                 },
             ]
             result = (
-                await db_to_use[Collections.tokens_links_v2]
+                await db_to_use[Collections.tokens_links_v3]
                 .aggregate(pipeline)
                 .to_list(1)
             )
@@ -225,7 +225,7 @@ async def get_info_for_token_address(
             },
         ]
         result = (
-            await db_to_use[Collections.tokens_links_v2].aggregate(pipeline).to_list(1)
+            await db_to_use[Collections.tokens_links_v3].aggregate(pipeline).to_list(1)
         )
         if "total" in result[0]:
             current_holders_count = result[0]["total"]
@@ -234,7 +234,7 @@ async def get_info_for_token_address(
         token_from_collection.update({"current_holders_count": current_holders_count})
         # # get current owner from the token_links collection
         # current_owner_link = (
-        #     await db_to_use[Collections.tokens_links_v2]
+        #     await db_to_use[Collections.tokens_links_v3]
         #     .find({"token_holding.token_address": token_address})
         #     .to_list(length=None)
         # )
@@ -327,7 +327,7 @@ async def get_token_current_holders(
             },
         ]
         result = (
-            await db_to_use[Collections.tokens_links_v2]
+            await db_to_use[Collections.tokens_links_v3]
             .aggregate(pipeline)
             .to_list(limit)
         )
@@ -427,7 +427,7 @@ async def get_token_cis_2_compliance(
             {"$limit": 1},
         ]
         result = (
-            await db_to_use[Collections.tokens_links_v2]
+            await db_to_use[Collections.tokens_links_v3]
             .aggregate(pipeline)
             .to_list(length=1)
         )

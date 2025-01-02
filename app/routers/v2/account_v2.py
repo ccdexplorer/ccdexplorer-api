@@ -125,13 +125,13 @@ async def get_account_tokens_available(
     api_key: str = Security(API_KEY_HEADER),
 ) -> bool:
     """
-    Endpoint to determine if a given account holds tokens, as stored in MongoDB collection `tokens_links_v2`.
+    Endpoint to determine if a given account holds tokens, as stored in MongoDB collection `tokens_links_v3`.
 
 
     """
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     result_list = list(
-        db_to_use[Collections.tokens_links_v2]
+        db_to_use[Collections.tokens_links_v3]
         .find({"account_address_canonical": account_address[:29]})
         .limit(1)
     )
@@ -153,7 +153,7 @@ async def get_account_fungible_tokens_value_in_USD(
     api_key: str = Security(API_KEY_HEADER),
 ) -> float:
     """
-    Endpoint to get sum of all fungible tokens in USD for a given account, as stored in MongoDB collection `tokens_links_v2`.
+    Endpoint to get sum of all fungible tokens in USD for a given account, as stored in MongoDB collection `tokens_links_v3`.
 
 
     """
@@ -175,7 +175,7 @@ async def get_account_fungible_tokens_value_in_USD(
         {"$match": {"account_address_canonical": account_address[:29]}},
     ]
     result_list = (
-        await db_to_use[Collections.tokens_links_v2]
+        await db_to_use[Collections.tokens_links_v3]
         .aggregate(pipeline)
         .to_list(length=None)
     )
@@ -313,7 +313,7 @@ async def get_account_fungible_tokens_verified(
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """
-    Endpoint to get verified fungible tokens for a given account, as stored in MongoDB collection `tokens_links_v2`.
+    Endpoint to get verified fungible tokens for a given account, as stored in MongoDB collection `tokens_links_v3`.
     """
     # if net == "testnet":
     #     raise HTTPException(
@@ -351,7 +351,7 @@ async def get_account_fungible_tokens_verified(
         },
     ]
     result = (
-        await db_to_use[Collections.tokens_links_v2]
+        await db_to_use[Collections.tokens_links_v3]
         .aggregate(pipeline)
         .to_list(length=None)
     )
@@ -436,7 +436,7 @@ async def get_account_non_fungible_tokens_verified(
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """
-    Endpoint to get verified non fungible tokens for a given account, as stored in MongoDB collection `tokens_links_v2`.
+    Endpoint to get verified non fungible tokens for a given account, as stored in MongoDB collection `tokens_links_v3`.
     """
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     non_fungible_token_contracts = [
@@ -465,7 +465,7 @@ async def get_account_non_fungible_tokens_verified(
         },
     ]
     result = (
-        await db_to_use[Collections.tokens_links_v2]
+        await db_to_use[Collections.tokens_links_v3]
         .aggregate(pipeline)
         .to_list(length=None)
     )
@@ -532,7 +532,7 @@ async def get_account_tokens_unverified(
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """
-    Endpoint to get unverified tokens for a given account, as stored in MongoDB collection `tokens_links_v2`.
+    Endpoint to get unverified tokens for a given account, as stored in MongoDB collection `tokens_links_v3`.
     """
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     verified_token_contracts = [
@@ -561,7 +561,7 @@ async def get_account_tokens_unverified(
         },
     ]
     result = (
-        await db_to_use[Collections.tokens_links_v2]
+        await db_to_use[Collections.tokens_links_v3]
         .aggregate(pipeline)
         .to_list(length=None)
     )
