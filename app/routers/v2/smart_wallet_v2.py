@@ -428,12 +428,24 @@ async def get_token_balances_for_public_key_from_smart_wallet_contract(
     pipeline = [
         {"$match": {"wallet_contract_address": wallet_contract_address}},
         {"$match": {"address_or_public_key": public_key}},
-        {"$group": {"_id": "$cis2_token_contract_address"}},
+        # {"$group": {"_id": "$cis2_token_contract_address"}},
     ]
-    cis2_contracts = [
-        x["_id"]
-        for x in db_to_use[Collections.cis5_public_keys_contracts].aggregate(pipeline)
+
+    links_for_key = [
+        x for x in db_to_use[Collections.cis5_public_keys_contracts].aggregate(pipeline)
     ]
+    cis2_contracts_dict = {
+        f'{x["cis2_token_contract_address"]}-{x["token_id_or_ccd"]}': {
+            "token_id": x["token_id_or_ccd"],
+            "contract": x["cis2_token_contract_address"],
+        }
+        for x in links_for_key
+        if x["token_id_or_ccd"] != "ccd"
+    }
+    # cis2_contracts = [
+    #     x["_id"]
+    #     for x in db_to_use[Collections.cis5_public_keys_contracts].aggregate(pipeline)
+    # ]
 
     block_hash = "last_final"
     instance_index = wallet_contract_address_index
@@ -449,14 +461,16 @@ async def get_token_balances_for_public_key_from_smart_wallet_contract(
         return []
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint, NET(net))
 
-    token_balances: dict[dict] = {}
-    public_keys = [public_key]
-    for cis_2_contract in cis2_contracts:
-        if not isinstance(cis_2_contract, str):
-            continue
-        cis_2_contract_address = CCD_ContractAddress.from_str(cis_2_contract)
-        token_id = ""
+    token_balance_ccd: dict[dict] = {}
+    token_balances_fungible: dict[dict] = {}
+    token_balances_non_fungible: dict[dict] = {}
+    token_balances_unverified: dict[dict] = {}
 
+    public_keys = [public_key]
+    for cis_2_contract_address_str, cis2_dict in cis2_contracts_dict.items():
+
+        cis_2_contract_address = CCD_ContractAddress.from_str(cis2_dict["contract"])
+        token_id = cis2_dict["token_id"]
         rr, ii = ci.CIS2balanceOf(
             block_hash, cis_2_contract_address, token_id, public_keys
         )
@@ -464,50 +478,59 @@ async def get_token_balances_for_public_key_from_smart_wallet_contract(
         if ii.failure.used_energy > 0:
             print(ii.failure)
         else:
-            token_balances[cis_2_contract] = {
-                "contract": cis_2_contract,
+
+            token_amount = rr[0]
+            fungible = False
+            unverified = True
+            fungible_result = None
+            non_fungible_result = None
+            # now try to get additional information from tokens_tags
+            token_address = cis_2_contract_address_str
+            if token_id == "":
+                # search for fungible token
+                fungible_result = db_to_use[Collections.tokens_tags].find_one(
+                    {"related_token_address": token_address}
+                )
+            else:
+                non_fungible_result = db_to_use[Collections.tokens_tags].find_one(
+                    {"contracts": {"$in": [cis2_dict["contract"]]}}
+                )
+
+            fungible = fungible_result is not None
+            unverified = (fungible_result is None) and (non_fungible_result is None)
+
+            this_token = {
+                "token_address": cis_2_contract_address_str,
+                "contract": cis2_dict["contract"],
                 "public_key": public_key,
                 "balance": rr[0],
             }
-
-            token_amount = rr[0]
-            # now try to get additional information from tokens_tags
-            token_address = f"{cis_2_contract}-{token_id}"
-            result = db_to_use[Collections.tokens_tags].find_one(
-                {"related_token_address": token_address}
-            )
-            token_balances[cis_2_contract].update({"verified_information": result})
+            if fungible:
+                this_token.update({"verified_information": fungible_result})
+            else:
+                this_token.update({"verified_information": non_fungible_result})
 
             result = db_to_use[Collections.tokens_token_addresses_v2].find_one(
                 {"_id": token_address}
             )
-            token_balances[cis_2_contract].update({"address_information": result})
-            token_vi = token_balances[cis_2_contract]["verified_information"]
+            this_token.update({"address_information": result})
 
-            token_balances[cis_2_contract].update(
-                {"token_symbol": token_vi["get_price_from"]}
-            )
-            token_balances[cis_2_contract].update({"decimals": token_vi["decimals"]})
-            token_balances[cis_2_contract].update(
-                {
-                    "token_value": int(token_amount)
-                    * (math.pow(10, -token_balances[cis_2_contract]["decimals"]))
-                }
-            )
-            if token_balances[cis_2_contract]["token_symbol"] in exchange_rates:
-                token_balances[cis_2_contract].update(
-                    {
-                        "token_value_USD": (
-                            token_balances[cis_2_contract]["token_value"]
-                            * exchange_rates[
-                                token_balances[cis_2_contract]["token_symbol"]
-                            ]["rate"]
-                        )
-                    }
+            token_vi = this_token["verified_information"]
+            if not token_vi:
+                continue
+
+            if fungible:
+                if "get_price_from" not in token_vi:
+                    continue
+                this_token = update_fungible_token_with_price_info(
+                    exchange_rates, this_token, token_amount, token_vi
                 )
-
+                token_balances_fungible[cis_2_contract_address_str] = this_token
             else:
-                token_balances[cis_2_contract].update({"token_value_USD": 0})
+                token_balances_non_fungible[cis_2_contract_address_str] = this_token
+
+            if unverified:
+                token_balances_unverified[cis_2_contract_address_str] = this_token
 
     ## same for CCD
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint_ccd, NET(net))
@@ -516,16 +539,48 @@ async def get_token_balances_for_public_key_from_smart_wallet_contract(
     if ii.failure.used_energy > 0:
         print(ii.failure)
     else:
-        token_balances["ccd"] = {
+        token_balance_ccd["ccd"] = {
             "contract": "ccd",
             "public_key": public_key,
             "balance": rr[0],
         }
-        token_balances["ccd"].update(
+        token_balance_ccd["ccd"].update(
             {"ccd_balance_in_USD": (rr[0] / 1_000_000) * exchange_rates["CCD"]["rate"]}
         )
 
-    return token_balances
+    return {
+        "ccd": token_balance_ccd,
+        "fungible": token_balances_fungible,
+        "non_fungible": token_balances_non_fungible,
+        "unverified": token_balances_unverified,
+    }
+
+
+def update_fungible_token_with_price_info(
+    exchange_rates,
+    this_token_: dict,
+    token_amount,
+    token_vi,
+):
+
+    this_token_.update({"token_symbol": token_vi["get_price_from"]})
+    this_token_.update({"decimals": token_vi["decimals"]})
+    this_token_.update(
+        {"token_value": int(token_amount) * (math.pow(10, -this_token_["decimals"]))}
+    )
+    if this_token_["token_symbol"] in exchange_rates:
+        this_token_.update(
+            {
+                "token_value_USD": (
+                    this_token_["token_value"]
+                    * exchange_rates[this_token_["token_symbol"]]["rate"]
+                )
+            }
+        )
+    else:
+        this_token_.update({"token_value_USD": 0})
+
+    return this_token_
 
 
 @router.get(
