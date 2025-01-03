@@ -10,7 +10,6 @@ from ccdexplorer_fundamentals.GRPCClient.CCD_Types import (
 from ccdexplorer_fundamentals.mongodb import (
     Collections,
     MongoDB,
-    MongoMotor,
     MongoTypeInstance,
 )
 
@@ -24,18 +23,9 @@ from app.state_getters import (
     get_exchange_rates,
     get_grpcclient,
     get_mongo_db,
-    get_mongo_motor,
 )
 
 # from app.utils import TokenHolding
-
-from .contract_v2 import (
-    GetBalanceOfRequest,
-    GetCIS5BalanceOfRequest,
-    get_cis5_balance_of,
-    get_balance_of,
-    get_module_name_from_contract_address,
-)
 
 
 class CIS5PublicKeysContracts(BaseModel):
@@ -174,132 +164,6 @@ async def get_deployed_tx_for_public_key_from_smart_wallet_contract(
 
 
 @router.get(
-    "/{net}/smart-wallet/{wallet_contract_address_index}/{wallet_contract_address_subindex}/public-key/{public_key}/{skip}/{limit}/verified",
-    response_class=JSONResponse,
-)
-async def get_public_key_fungible_tokens_verified(
-    request: Request,
-    net: str,
-    wallet_contract_address_index: int,
-    wallet_contract_address_subindex: int,
-    public_key: str,
-    skip: int,
-    limit: int,
-    mongomotor: MongoMotor = Depends(get_mongo_motor),
-    grpcclient: GRPCClient = Depends(get_grpcclient),
-    exchange_rates: dict = Depends(get_exchange_rates),
-    api_key: str = Security(API_KEY_HEADER),
-) -> dict:
-    """
-    Endpoint to get verified fungible tokens for a given public key, as stored in MongoDB collection `cis5_public_keys_contracts`.
-    """
-
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
-    fungible_token_result = (
-        await db_to_use[Collections.tokens_tags]
-        .find({"token_type": "fungible"}, {"contracts": 1})
-        .to_list(length=None)
-    )
-
-    fungible_token_addresses = [
-        x["contracts"][0]
-        for x in fungible_token_result
-        # if "related_token_address" in x
-    ]
-
-    pipeline = [
-        {"$match": {"address_canonical_or_public_key": public_key}},
-        {"$match": {"cis2_token_contract_address": {"$in": fungible_token_addresses}}},
-        {
-            "$facet": {
-                "metadata": [{"$count": "total"}],
-                "data": [{"$skip": skip}, {"$limit": limit}],
-            }
-        },
-        {
-            "$project": {
-                "data": 1,
-                "total": {"$arrayElemAt": ["$metadata.total", 0]},
-            }
-        },
-    ]
-    result = (
-        await db_to_use[Collections.cis5_public_keys_contracts]
-        .aggregate(pipeline)
-        .to_list(length=None)
-    )
-    all_tokens = [x for x in result[0]["data"]]
-    if "total" in result[0]:
-        total_token_count = result[0]["total"]
-    else:
-        total_token_count = 0
-    tokens = [CIS5PublicKeysContracts(**x) for x in all_tokens]
-
-    # add verified information and metadata and USD value
-    for index, token in enumerate(tokens):
-        token.token_id = "" if token.token_id is None else token.token_id
-        token.token_address = f"{token.cis2_token_contract_address}-{token.token_id}"
-        result = await db_to_use[Collections.tokens_tags].find_one(
-            {"related_token_address": token.token_address}
-        )
-        token.verified_information = result
-
-        module_name = await get_module_name_from_contract_address(
-            db_to_use,
-            CCD_ContractAddress.from_str(token.wallet_contract_address),
-        )
-
-        request = GetCIS5BalanceOfRequest(
-            net=net,
-            wallet_contract_address=CCD_ContractAddress.from_str(
-                token.wallet_contract_address
-            ),
-            cis2_contract_address=CCD_ContractAddress.from_str(
-                token.cis2_token_contract_address
-            ),
-            token_id=(
-                ""
-                if result["related_token_address"].replace(
-                    token.cis2_token_contract_address, ""
-                )
-                == "-"
-                else result["related_token_address"].replace(
-                    f"{token.cis2_token_contract_address}-", ""
-                )
-            ),
-            module_name=module_name,
-            public_keys=[public_key],
-            grpcclient=grpcclient,
-        )
-        token_amount_from_state = await get_cis5_balance_of(request)
-        token.token_amount = token_amount_from_state.get(public_key, 0)
-
-        token.token_symbol = token.verified_information["get_price_from"]
-        token.decimals = token.verified_information["decimals"]
-        token.token_value = int(token.token_amount) * (math.pow(10, -token.decimals))
-        if token.token_symbol in exchange_rates:
-            token.token_value_USD = (
-                token.token_value * exchange_rates[token.token_symbol]["rate"]
-            )
-        else:
-            token.token_value_USD = 0
-
-        result = await db_to_use[Collections.tokens_token_addresses_v2].find_one(
-            {"_id": token.token_address}
-        )
-        token.address_information = result
-
-    if len(tokens) > 0:
-
-        return {"tokens": tokens, "total_token_count": total_token_count}
-    else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Requested public key ({public_key}) has no fungible verified tokens on {net}",
-        )
-
-
-@router.get(
     "/{net}/smart-wallet/{wallet_contract_address_index}/{wallet_contract_address_subindex}/public-key/{public_key}/transaction-count",
     response_class=JSONResponse,
 )
@@ -428,7 +292,6 @@ async def get_token_balances_for_public_key_from_smart_wallet_contract(
     pipeline = [
         {"$match": {"wallet_contract_address": wallet_contract_address}},
         {"$match": {"address_or_public_key": public_key}},
-        # {"$group": {"_id": "$cis2_token_contract_address"}},
     ]
 
     links_for_key = [
@@ -442,10 +305,6 @@ async def get_token_balances_for_public_key_from_smart_wallet_contract(
         for x in links_for_key
         if x["token_id_or_ccd"] != "ccd"
     }
-    # cis2_contracts = [
-    #     x["_id"]
-    #     for x in db_to_use[Collections.cis5_public_keys_contracts].aggregate(pipeline)
-    # ]
 
     block_hash = "last_final"
     instance_index = wallet_contract_address_index
@@ -566,7 +425,7 @@ def update_fungible_token_with_price_info(
     this_token_.update({"token_symbol": token_vi["get_price_from"]})
     this_token_.update({"decimals": token_vi["decimals"]})
     this_token_.update(
-        {"token_value": int(token_amount) * (math.pow(10, -this_token_["decimals"]))}
+        {"token_value": int(token_amount) * (math.pow(10, -token_vi["decimals"]))}
     )
     if this_token_["token_symbol"] in exchange_rates:
         this_token_.update(

@@ -74,7 +74,7 @@ from ratelimit.types import ASGIApp, Receive, Scope, Send
 from redis.asyncio import StrictRedis
 
 from app.ratelimiting import AUTH_FUNCTION, handle_429, handle_auth_error
-
+import paho.mqtt.client as mqtt
 import sentry_sdk
 
 if environment["SITE_URL"] != "http://127.0.0.1:8000":
@@ -83,6 +83,32 @@ if environment["SITE_URL"] != "http://127.0.0.1:8000":
         traces_sample_rate=1.0,
         _experiments={"continuous_profiling_auto_start": True},
     )
+
+
+# The callback for when the client receives a CONNACK response from the server.
+def on_connect(client, userdata, flags, reason_code, properties):
+    print(f"MQTT connected with result code: {reason_code}")
+
+
+def on_subscribe(client, userdata, mid, reason_code_list, properties):
+    if reason_code_list[0].is_failure:
+        print(f"Broker rejected you subscription: {reason_code_list[0]}")
+    else:
+        print(f"Broker granted the following QoS: {reason_code_list[0].value}")
+
+
+mqttc = mqtt.Client(
+    mqtt.CallbackAPIVersion.VERSION2,
+    f"mqtt-{RUN_ON_NET}-{API_URL}-ccdexplorer-api",
+)
+
+mqttc.on_connect = on_connect
+mqttc.on_subscribe = on_subscribe
+
+mqttc.username_pw_set(MQTT_USER, MQTT_PASSWORD)
+mqttc.connect(MQTT_SERVER, 1883, 10)
+mqttc.subscribe("ccdexplorer/services/accounting/restart", qos=MQTT_QOS)
+mqttc.loop_start()
 
 
 @asynccontextmanager
@@ -97,6 +123,7 @@ async def lifespan(app: FastAPI):
     app.tooter = tooter
     app.mongodb = mongodb
     app.motormongo = motormongo
+    app.mqtt = mqttc
     init_time = dt.datetime.now().astimezone(dt.timezone.utc) - timedelta(seconds=10)
     app.users_last_requested = init_time
     app.exchange_rates_last_requested = init_time

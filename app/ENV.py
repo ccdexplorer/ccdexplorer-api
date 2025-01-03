@@ -20,6 +20,11 @@ API_ACCOUNT_MAINNET = "3GjqwYXv5sGY1QZdhx3uBdNz1LWUofQAn4tyV6wQu8cg9592Ur"
 API_NET = os.environ.get("API_NET", "mainnet")
 SENTRY_DSN = os.environ.get("SENTRY_DSN")
 SENTRY_ENVIRONMENT = os.environ.get("SENTRY_ENVIRONMENT")
+RUN_ON_NET = os.environ.get("RUN_ON_NET")
+MQTT_USER = os.environ.get("MQTT_USER")
+MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD")
+MQTT_SERVER = os.environ.get("MQTT_SERVER")
+MQTT_QOS = int(os.environ.get("MQTT_QOS"))
 
 environment = {
     "SITE_URL": SITE_URL,

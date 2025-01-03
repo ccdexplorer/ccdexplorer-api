@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Request, Depends, HTTPException, Security
-from app.ENV import API_KEY_HEADER
+from app.ENV import API_KEY_HEADER, MQTT_QOS
 from fastapi.responses import JSONResponse, RedirectResponse
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
-from ccdexplorer_fundamentals.cis import CIS, MongoTypeTokensTag
+from ccdexplorer_fundamentals.cis import CIS, MongoTypeTokensTag, MongoTypeTokenAddress
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_ContractAddress
 from ccdexplorer_fundamentals.enums import NET
 from ccdexplorer_fundamentals.mongodb import (
@@ -22,6 +22,7 @@ from app.routers.v2.contract_v2 import (
 )
 from app.utils import TokenHolding
 from datetime import date, datetime
+import json
 
 
 def json_serial(obj):
@@ -510,31 +511,16 @@ async def add_token_address_to_metadata_refresh_queue(
     token_from_collection = db_to_use[Collections.tokens_token_addresses_v2].find_one(
         {"_id": token_address}
     )
-
     if token_from_collection:
-        result = db_to_use[Collections.helpers].find_one(
-            {"_id": "refetch_token_metadata_url"}
+        ta: MongoTypeTokenAddress = MongoTypeTokenAddress(**token_from_collection)
+        repl_dict = ta.model_dump(exclude_none=True)
+        if "failed_attempt" in repl_dict:
+            del repl_dict["failed_attempt"]
+        request.app.mqtt.publish(
+            f"ccdexplorer/{net}/metadata/fetch",
+            json.dumps(repl_dict),
+            qos=MQTT_QOS,
         )
-        current_token_addresses: list = result["token_addresses"]
-        current_token_addresses.append(
-            {
-                "contract_index": contract_index,
-                "contract_subindex": contract_subindex,
-                "token_id": token_id,
-            }
-        )
-
-        queue_item = [
-            ReplaceOne(
-                {"_id": "refetch_token_metadata_url"},
-                replacement={
-                    "_id": "refetch_token_metadata_url",
-                    "token_addresses": current_token_addresses,
-                },
-                upsert=True,
-            )
-        ]
-        _ = db_to_use[Collections.helpers].bulk_write(queue_item)
         return JSONResponse({"detail": "Ok"})
     else:
         raise HTTPException(
