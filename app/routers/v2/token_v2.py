@@ -11,7 +11,6 @@ from ccdexplorer_fundamentals.mongodb import (
     Collections,
 )
 from pydantic import BaseModel
-from pymongo import ReplaceOne
 from app.state_getters import get_mongo_db, get_grpcclient, get_mongo_motor
 from json import dumps, loads
 from typing import Optional
@@ -20,7 +19,8 @@ from app.routers.v2.contract_v2 import (
     GetBalanceOfRequest,
     get_module_name_from_contract_address,
 )
-from app.utils import TokenHolding
+
+# from app.utils import TokenHolding
 from datetime import date, datetime
 import json
 

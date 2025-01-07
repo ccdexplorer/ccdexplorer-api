@@ -1,7 +1,7 @@
 import grpc
 from pymongo.collection import Collection
 from ccdexplorer_fundamentals.enums import NET
-from ccdexplorer_fundamentals.cis import MongoTypeLoggedEvent, CIS
+from ccdexplorer_fundamentals.cis import MongoTypeLoggedEvent
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import (
     CCD_AccountInfo,
@@ -10,7 +10,6 @@ from ccdexplorer_fundamentals.GRPCClient.CCD_Types import (
     CCD_ContractAddress,
 )
 import dateutil
-from typing import Optional
 from ccdexplorer_fundamentals.mongodb import (
     Collections,
     MongoMotor,
@@ -19,11 +18,9 @@ from ccdexplorer_fundamentals.mongodb import (
     MongoTypeBlockPerDay,
     MongoImpactedAddress,
 )
-from ccdexplorer_fundamentals.tooter import Tooter, TooterChannel, TooterType  # noqa
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 import datetime as dt
 import math
 from pymongo import DESCENDING, ASCENDING

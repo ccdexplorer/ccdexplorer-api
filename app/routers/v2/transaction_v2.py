@@ -23,10 +23,18 @@ async def get_transaction_logged_events(
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[MongoTypeLoggedEvent]:
     """
-    Endpoint to get logged events for a transaction as stored in MongoDB collection `tokens_logged_events`. Note that only
-    logged events are stored that are relevant for token accounting, so `mint`, `transfer`, `burn` and `metadata`.
-    See http://proposals.concordium.software/CIS/cis-2.html for further details on these events.
+    Get logged events for a transaction from the MongoDB `tokens_logged_events` collection.
 
+    Parameters:
+    - net (str): Network type, either "testnet" or "mainnet".
+    - tx_hash (str): The transaction hash to look up.
+    - mongodb (MongoDB, optional): MongoDB dependency, defaults to `get_mongo_db`.
+
+    Returns:
+    - list[MongoTypeLoggedEvent]: A list of logged events for the specified transaction.
+
+    Raises:
+    - HTTPException: If the transaction hash is not found in the specified network.
 
     """
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
@@ -60,9 +68,18 @@ async def get_transaction(
     api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_BlockItemSummary:
     """
-    Endpoint to get a transaction as stored in MongoDB collection `transactions`.
+    Retrieve a transaction from the MongoDB `transactions` collection.
 
+    Parameters:
+    - net (str): Network type, either "testnet" or "mainnet".
+    - tx_hash (str): The transaction hash to look up.
+    - mongodb (MongoDB, optional): MongoDB dependency, defaults to `get_mongo_db`.
 
+    Returns:
+    - CCD_BlockItemSummary: The transaction summary from the MongoDB collection.
+
+    Raises:
+    - HTTPException: If the transaction hash is not found in the specified network.
     """
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     result = db_to_use[Collections.transactions].find_one(tx_hash)

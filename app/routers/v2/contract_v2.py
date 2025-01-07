@@ -369,17 +369,18 @@ async def get_instance_tnt_ids(
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
-    Endpoint to get all tnt ids for instance.
+    Endpoint to get all CIS-6 ids for instance.
     """
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     instance_address = f"<{contract_index},{contract_subindex}>"
     pipeline = [
+        {"$match": {"event_info.standard": "CIS-6"}},
         {
-            "$match": {"contract": instance_address},
+            "$match": {"event_info.contract": instance_address},
         },
         {
             "$group": {
-                "_id": "$item_id",
+                "_id": "$recognized_event.item_id",
             }
         },
         {
@@ -391,7 +392,7 @@ async def get_instance_tnt_ids(
     ]
     item_ids = [
         x["distinctValues"]
-        for x in await db_to_use[Collections.tnt_logged_events]
+        for x in await db_to_use[Collections.tokens_logged_events_v2]
         .aggregate(pipeline)
         .to_list(length=None)
     ]
@@ -412,27 +413,27 @@ async def get_instance_tnt_logged_events(
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
-    Endpoint to get all tnt logged events for instance.
+    Endpoint to get all CIS-6 logged events for instance.
     """
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     instance_address = f"<{contract_index},{contract_subindex}>"
     pipeline_for_all = [
+        {"$match": {"event_info.standard": "CIS-6"}},
         {
-            "$match": {"contract": instance_address},
+            "$match": {"event_info.contract": instance_address},
         },
         {
             "$project": {
                 "_id": 0,
-                "result": 1,
-                "contract": 1,
-                "tx_hash": 1,
-                "sender": 1,
-                "timestamp": 1,
+                "recognized_event": 1,
+                "event_info": 1,
+                "tx_info": 1,
+                "date": 1,
             }
         },
     ]
     all_logged_events = (
-        await db_to_use[Collections.tnt_logged_events]
+        await db_to_use[Collections.tokens_logged_events_v2]
         .aggregate(pipeline_for_all)
         .to_list(length=None)
     )
@@ -454,17 +455,18 @@ async def get_instance_tnt_logged_events_for_item_id(
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
-    Endpoint to get all tnt logged events for instance.
+    Endpoint to get all CIS-6 logged events for instance.
     """
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     instance_address = f"<{contract_index},{contract_subindex}>"
     pipeline = [
-        {"$match": {"contract": instance_address}},
-        {"$match": {"item_id": item_id}},
-        {"$sort": {"block_height": DESCENDING}},
+        {"$match": {"event_info.standard": "CIS-6"}},
+        {"$match": {"event_info.contract": instance_address}},
+        {"$match": {"recognized_event.item_id": item_id}},
+        {"$sort": {"tx_info.block_height": DESCENDING}},
     ]
     item_id_statuses = (
-        await db_to_use[Collections.tnt_logged_events]
+        await db_to_use[Collections.tokens_logged_events_v2]
         .aggregate(pipeline)
         .to_list(length=None)
     )
