@@ -75,16 +75,38 @@ async def get_all_smart_wallet_contracts_info(
         result = list(
             db_to_use[Collections.tokens_logged_events_v2].aggregate(pipeline)
         )
-        active_addresses = set()
+        active_addresses = {}
         for log in result:
             if "to_address_canonical" in log:
                 if len(log["to_address_canonical"]) == 64:
-                    active_addresses.add(log["to_address_canonical"])
+                    if (log["to_address_canonical"] not in active_addresses) and (
+                        log["from_address_canonical"] not in active_addresses
+                    ):
+                        active_addresses[log["to_address_canonical"]] = {
+                            "public_key": log["to_address_canonical"],
+                            "last_active_date": log["tx_info"]["date"],
+                            "last_active_block": log["tx_info"]["block_height"],
+                        }
 
             if "from_address_canonical" in log:
-                if len(log["from_address_canonical"]) == 64:
-                    active_addresses.add(log["from_address_canonical"])
-        wallets_dict[x["_id"]].update({"active_addresses": list(active_addresses)[:10]})
+                if (log["to_address_canonical"] not in active_addresses) and (
+                    log["from_address_canonical"] not in active_addresses
+                ):
+                    if len(log["from_address_canonical"]) == 64:
+                        active_addresses[log["from_address_canonical"]] = {
+                            "public_key": log["from_address_canonical"],
+                            "last_active_date": log["tx_info"]["date"],
+                            "last_active_block": log["tx_info"]["block_height"],
+                        }
+        # Sort and limit active_addresses
+        sorted_addresses = dict(
+            sorted(
+                active_addresses.items(),
+                key=lambda x: x[1]["last_active_block"],
+                reverse=True,
+            )[:10]
+        )
+        wallets_dict[x["_id"]].update({"active_addresses": sorted_addresses})
     return wallets_dict
 
 
