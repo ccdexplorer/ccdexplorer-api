@@ -308,6 +308,38 @@ async def get_tx_data_for_project(
 
 
 @router.get(
+    "/{net}/misc/statistics-chain/{start_date}/{end_date}",
+    response_class=JSONResponse,
+)
+async def get_data_for_chain_analysis(
+    request: Request,
+    net: str,
+    start_date: str,
+    end_date: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+    """
+    Endpoint to get data for analysis.
+    """
+
+    dates_to_include = generate_dates_from_start_until_end(start_date, end_date)
+    pipeline = [
+        {"$match": {"date": {"$in": dates_to_include}}},
+        {"$match": {"type": "statistics_transaction_types"}},
+        {"$match": {"project": "all"}},
+        {"$project": {"_id": 0, "type": 0, "usecase": 0, "project": 0}},
+        {"$sort": {"date": 1}},
+    ]
+    result = (
+        await mongomotor.mainnet[Collections.statistics]
+        .aggregate(pipeline)
+        .to_list(length=None)
+    )
+    return JSONResponse([x for x in result])
+
+
+@router.get(
     "/{net}/misc/statistics/{analysis}/{start_date}/{end_date}",
     response_class=JSONResponse,
 )
