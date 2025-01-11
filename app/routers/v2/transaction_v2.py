@@ -37,6 +37,12 @@ async def get_transaction_logged_events(
     - HTTPException: If the transaction hash is not found in the specified network.
 
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     pipeline = [
         {"$match": {"tx_hash": tx_hash}},
@@ -81,6 +87,12 @@ async def get_transaction(
     Raises:
     - HTTPException: If the transaction hash is not found in the specified network.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     result = db_to_use[Collections.transactions].find_one(tx_hash)
     if result:

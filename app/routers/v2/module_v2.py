@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends, Security
+from fastapi import APIRouter, Request, Depends, Security, HTTPException
 from app.ENV import API_KEY_HEADER
 from fastapi.responses import JSONResponse
 from ccdexplorer_fundamentals.GRPCClient import GRPCClient
@@ -30,6 +30,12 @@ async def get_module_deployment_tx(
     """
     Endpoint to get tx in which the module was deployed.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
 
     result = await db_to_use[Collections.transactions].find_one(
@@ -54,6 +60,12 @@ async def get_module_schema(
     """
     Endpoint to get schema from module source.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     ms: VersionedModuleSource = grpcclient.get_module_source_original_classes(
         module_ref, "last_final", net=NET(net)
     )
@@ -83,6 +95,24 @@ async def get_module_instances(
     """
     Endpoint to get instances from module ref.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
+
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     pipeline = [
         {"$match": {"source_module": module_ref}},
@@ -125,6 +155,12 @@ async def get_module_usage(
     """
     Endpoint to get usage over time for instances from module ref.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     module_instances_result = (
         await db_to_use[Collections.instances]
@@ -160,6 +196,12 @@ async def get_module(
     """
     Endpoint to get schema from module source.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     result = await db_to_use[Collections.modules].find_one({"_id": module_ref})
 

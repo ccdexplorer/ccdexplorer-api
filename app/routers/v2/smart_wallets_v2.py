@@ -2,7 +2,7 @@ from ccdexplorer_fundamentals.mongodb import (
     Collections,
     MongoDB,
 )
-from fastapi import APIRouter, Depends, Request, Security
+from fastapi import APIRouter, Depends, Request, Security, HTTPException
 from fastapi.responses import JSONResponse
 from pymongo.collection import Collection
 from app.ENV import API_KEY_HEADER
@@ -30,6 +30,12 @@ async def get_all_smart_wallet_contracts_info(
     Returns:
         list[str]: A list of unique smart wallet contract addresses.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     distinct_wallet_addresses = list(
         db_to_use[Collections.cis5_public_keys_contracts].distinct(
@@ -129,6 +135,12 @@ async def get_all_smart_wallet_contracts(
     Returns:
         list[str]: A list of unique smart wallet contract addresses.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     distinct_wallet_addresses = list(
         db_to_use[Collections.cis5_public_keys_contracts].distinct(
@@ -185,6 +197,12 @@ async def get_smart_wallet_public_key_creations_per_day(
     api_key: str = Security(API_KEY_HEADER),
 ) -> list:
     """ """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     height_for_first_block_start_date, height_for_last_block_end_date = (
         get_block_ranges_from_start_and_end_dates(start_date, end_date, db_to_use)

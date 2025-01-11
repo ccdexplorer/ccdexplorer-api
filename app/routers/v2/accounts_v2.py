@@ -28,6 +28,11 @@ async def get_accounts_count_estimate(
     Endpoint to get the accounts estimated count.
 
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     try:
@@ -63,6 +68,12 @@ async def get_account_indexes(
     Endpoint to get the the account_indexes for a list of canonical account_ids.
 
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     body = await request.body()
     if body:
         account_ids = json.loads(body.decode("utf-8"))
@@ -101,6 +112,12 @@ async def get_account_addresses(
     Endpoint to get the the account_addresses for a list of account_indexes.
 
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     body = await request.body()
     if body:
         account_indexes = json.loads(body.decode("utf-8"))
@@ -139,6 +156,11 @@ async def get_current_payday_info(
     Endpoint to get the current payday info.
 
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     try:
@@ -172,6 +194,11 @@ async def get_last_payday_info(
     Endpoint to get the last payday block info.
 
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     result = await db_to_use[Collections.paydays].find_one(sort=[("date", -1)])
@@ -197,6 +224,12 @@ async def get_last_accounts(
     Endpoint to get the last X accounts. Maxes out at 50.
 
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     count = min(50, max(count, 1))
     error = None
@@ -256,6 +289,12 @@ async def get_nodes_and_validators(
     Endpoint to get nodes and validators.
 
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
 
     all_nodes = (
@@ -344,6 +383,12 @@ async def get_payday_pools(
     """
     Endpoint to get payday pools.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     last_payday = MongoTypePayday(
         **await db_to_use[Collections.paydays].find_one(sort=[("date", -1)])
@@ -487,6 +532,24 @@ async def get_paydays(
     """
     Endpoint to get paydays.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     result = (
         await db_to_use[Collections.paydays]
@@ -512,6 +575,12 @@ async def get_payday_passive_info(
     """
     Endpoint to get payday passive information.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     passive_delegation_info = grpcclient.get_passive_delegation_info("last_final")
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     passive_delegation_apy_object = await db_to_use[
@@ -559,6 +628,24 @@ async def get_payday_passive_delegators(
     """
     Endpoint to get payday passive delegators.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
+
     delegators_current_payday = [
         x
         for x in grpcclient.get_delegators_for_passive_delegation_in_reward_period(

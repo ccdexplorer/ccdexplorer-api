@@ -38,6 +38,11 @@ async def get_tokens_count_estimate(
     Endpoint to get the tokens estimated count.
 
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     try:
@@ -72,6 +77,12 @@ async def get_fungible_tokens_verified(
     """
     Endpoint to get verified fungible tokens on 'net'.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     pipeline = [
         {
@@ -134,6 +145,12 @@ async def get_non_fungible_tokens_verified(
     """
     Endpoint to get verified non-fungible tokens on 'net'.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     pipeline = [
         {

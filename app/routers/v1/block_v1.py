@@ -22,6 +22,12 @@ async def get_block_at_height_from_grpc(
     """
     Endpoint to get blockInfo from the node.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     try:
         height_or_hash = int(height_or_hash)
     except ValueError:
@@ -45,6 +51,12 @@ async def get_last_finalized_block(
     """
     Endpoint to get the last block from the node.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     result = grpcclient.get_finalized_blocks()
     if result:
         return result

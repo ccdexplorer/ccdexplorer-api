@@ -89,6 +89,12 @@ async def get_token_based_on_token_id(
     Endpoint to get a token based on tag and token_id.
     """
 
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     tag_result = await db_to_use[Collections.tokens_tags].find_one({"_id": tag})
 
@@ -187,6 +193,12 @@ async def get_info_for_token_address(
     Endpoint to get information for a given token address. For Provenance Tags specifically, the `owner_history`
     property is added if available.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     token_id = "" if token_id == "_" else token_id
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     token_address = f"<{contract_index},{contract_subindex}>-{token_id}"
@@ -208,6 +220,11 @@ async def get_info_for_token_address(
         ].find_one(
             {"$and": [{"token_address": token_address}, {"event_type": "mint_event"}]}
         )
+        if not mint_event_logged_event:
+            raise HTTPException(
+                status_code=500,
+                detail=f"mint_event for requested token_id {token_id} from contract <{contract_index},{contract_subindex}> is not found on {net}.",
+            )
         token_from_collection.update(
             {"mint_tx_hash": mint_event_logged_event["tx_hash"]}
         )
@@ -297,21 +314,30 @@ async def get_token_current_holders(
     """
     Endpoint to get current token holders for token.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
+
     token_id = "" if token_id == "_" else token_id
     token_address = f"<{contract_index},{contract_subindex}>-{token_id}"
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     try:
         pipeline = [
             {"$match": {"token_holding.token_address": token_address}},
-            # {
-            #     "$addFields": {
-            #         "token_holding.token_amount_numeric": {
-            #             "$toDouble": "$token_holding.token_amount"
-            #         }
-            #     }
-            # },
-            # # Sort by the numeric version of token_holding.token_amount
-            # {"$sort": {"token_holding.token_amount_numeric": -1}},
             {
                 "$facet": {
                     "metadata": [{"$count": "total"}],
@@ -359,9 +385,9 @@ async def get_token_current_holders(
         for holder in current_holders:
             token_holding = TokenHolding(**holder["token_holding"])
 
-            token_holding.token_amount = token_amounts_from_state[
-                holder["account_address"]
-            ]
+            token_holding.token_amount = token_amounts_from_state.get(
+                holder["account_address"], 0
+            )
             holder["token_holding"] = token_holding
 
         consolidated = {}
@@ -417,6 +443,12 @@ async def get_token_cis_2_compliance(
     """
     Endpoint to get determination if all holder have zero of positive balance.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     token_id = "" if token_id == "_" else token_id
     token_address = f"<{contract_index},{contract_subindex}>-{token_id}"
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
@@ -455,6 +487,12 @@ async def get_info_for_token_tag(
     """
     Endpoint to get information for a given token tag.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     result = db_to_use[Collections.tokens_tags].find_one({"_id": tag})
     if result:
@@ -483,6 +521,11 @@ async def add_token_address_without_token_id_to_metadata_refresh_queue(
     """
     Endpoint to queue a token for a refresh of the metadata from the token metadataUrl where the token_id is None.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     return RedirectResponse(
         f"{router.prefix}/{net}/token/{contract_index}/{contract_subindex}/_/refresh"
@@ -505,6 +548,12 @@ async def add_token_address_to_metadata_refresh_queue(
     """
     Endpoint to queue a token for a refresh of the metadata from the token metadataUrl.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     token_id = "" if token_id == "_" else token_id
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     token_address = f"<{contract_index},{contract_subindex}>-{token_id}"
@@ -543,6 +592,11 @@ async def get_instance_tag_information(
     """
     Endpoint to get the recognized tag information from a tag id.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     result = await db_to_use[Collections.tokens_tags].find_one({"_id": tag})
@@ -571,6 +625,23 @@ async def get_nft_tag_tokens(
     """
     Endpoint to get individual tokens for recognized nft tag.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     tag_result = await db_to_use[Collections.tokens_tags].find_one({"_id": tag})

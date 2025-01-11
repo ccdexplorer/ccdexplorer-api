@@ -24,6 +24,12 @@ async def get_last_transactions(
     Endpoint to get the last X transactions as stored in MongoDB collection `transactions`. Maxes out at 50.
 
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     count = min(50, max(count, 1))
     error = None
@@ -61,6 +67,12 @@ async def get_transactions_tps(
     Endpoint to get the transactions TPS as stored in MongoDB collection `pre_render`.
 
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     if net != "mainnet":
         raise HTTPException(
             status_code=404,
@@ -94,6 +106,11 @@ async def get_transactions_count_estimate(
     Endpoint to get the transactions estimated count.
 
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     try:

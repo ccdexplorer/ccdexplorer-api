@@ -33,6 +33,12 @@ async def get_block_at_height_from_grpc(
     """
     Endpoint to get blockInfo from the node.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     try:
         height_or_hash = int(height_or_hash)
     except ValueError:
@@ -68,6 +74,23 @@ async def get_block_txs(
     """
     Endpoint to get transactions for the given block from mongodb.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     try:
@@ -108,6 +131,12 @@ async def get_block_payday_true_false(
     """
     Endpoint to get determine if a block is a payday block.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     try:
         # if this doesn't fail, it's type int.
         height_or_hash = int(height_or_hash)
@@ -182,6 +211,23 @@ async def get_block_payday_pool_rewards(
     """
     Endpoint to get pool rewards for the given block from mongodb.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
 
     db_to_use = mongomotor.mainnet
     try:
@@ -243,6 +289,23 @@ async def get_block_payday_account_rewards(
     """
     Endpoint to get account rewards for the given block from mongodb.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
 
     db_to_use = mongomotor.mainnet
     try:
@@ -299,6 +362,12 @@ async def get_block_special_events(
     """
     Endpoint to get special events for the given block.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     special_events = grpcclient.get_block_special_events(height, net=NET(net))
 
     if special_events:
@@ -321,6 +390,12 @@ async def get_block_chain_parameters(
     """
     Endpoint to get chain parameters for the given block.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     chain_parameters = grpcclient.get_block_chain_parameters(height, net=NET(net))
 
     if chain_parameters:
@@ -342,6 +417,12 @@ async def get_last_finalized_block(
     """
     Endpoint to get the last block from the node.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     result = grpcclient.get_finalized_blocks()
     if result:
         return result

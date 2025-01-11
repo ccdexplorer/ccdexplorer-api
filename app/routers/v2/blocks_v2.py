@@ -25,6 +25,12 @@ async def get_last_blocks(
     Endpoint to get the last X blocks as stored in MongoDB collection `blocks`. Maxes out at 50.
 
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     count = min(50, max(count, 1))
     error = None
@@ -44,6 +50,6 @@ async def get_last_blocks(
         return result
     else:
         raise HTTPException(
-            status_code=404,
+            status_code=500,
             detail=f"Error retrieving last {count} blocks on {net}, {error}.",
         )

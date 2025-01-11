@@ -133,6 +133,11 @@ async def get_schema_from_source(
     """
     Endpoint to get the schema as extracted from the source of a smart contract.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
 
@@ -195,6 +200,11 @@ async def get_token_information(
     """
     Endpoint to get the token information a smart contract.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
 
@@ -234,6 +244,11 @@ async def get_instance_information(
     """
     Endpoint to get the instance information for a smart contract.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     instance_info_grpc = grpcclient.get_instance_info(
         contract_index,
@@ -280,6 +295,12 @@ async def get_instance_CIS_support(
     """
     Endpoint to get CIS support for instance.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     if "." in net:
         net_to_use = NET(net.split(".")[1].lower())
     else:
@@ -326,6 +347,12 @@ async def get_instance_CIS_support_multiple(
     """
     Endpoint to get which CIS standard the instance reportedly supports.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     if "." in net:
         net_to_use = NET(net.split(".")[1].lower())
     else:
@@ -371,6 +398,12 @@ async def get_instance_tnt_ids(
     """
     Endpoint to get all CIS-6 ids for instance.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     instance_address = f"<{contract_index},{contract_subindex}>"
     pipeline = [
@@ -415,6 +448,12 @@ async def get_instance_tnt_logged_events(
     """
     Endpoint to get all CIS-6 logged events for instance.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     instance_address = f"<{contract_index},{contract_subindex}>"
     pipeline_for_all = [
@@ -457,6 +496,12 @@ async def get_instance_tnt_logged_events_for_item_id(
     """
     Endpoint to get all CIS-6 logged events for instance.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     instance_address = f"<{contract_index},{contract_subindex}>"
     pipeline = [
@@ -490,6 +535,12 @@ async def get_contract_tokens_available(
     Endpoint to determine if a given contract instance holds tokens,
     as stored in MongoDB collection `tokens_links_v3`.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     instance_address = f"<{contract_index},{contract_subindex}>"
     result_list = list(
@@ -517,6 +568,11 @@ async def get_instance_tag_information(
     """
     Endpoint to get the recognized tag information for a smart contract.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     instance_address = f"<{contract_index},{contract_subindex}>"
@@ -547,6 +603,12 @@ async def get_contract_deployment_tx(
     """
     Endpoint to get tx in which the instance was deployed.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     pipeline = [
         {

@@ -61,6 +61,12 @@ async def get_all_public_keys_for_smart_wallet_contract(
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[str]:
     """ """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
@@ -94,6 +100,12 @@ async def get_smart_wallet_details_from_public_key(
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """ """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     result = db_to_use[Collections.cis5_public_keys_contracts].find_one(
         {"address_or_public_key": public_key}
@@ -124,6 +136,12 @@ async def get_deployed_tx_for_public_key_from_smart_wallet_contract(
     api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_BlockItemSummary:
     """ """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
@@ -226,6 +244,24 @@ async def get_logged_events_for_public_key_from_smart_wallet_contract(
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """ """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
+
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
@@ -284,6 +320,12 @@ async def get_token_balances_for_public_key_from_smart_wallet_contract(
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """ """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
@@ -456,6 +498,12 @@ async def get_all_cis2_contracts_for_public_key_from_smart_wallet_contract(
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[str]:
     """ """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()

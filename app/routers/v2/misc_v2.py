@@ -30,6 +30,11 @@ async def get_bictory_cns_domain(
     """
     Endpoint to get possible Bictory CNS Domain name from tokenId.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     result = await db_to_use[Collections.cns_domains].find_one({"_id": tokenID})
@@ -55,6 +60,11 @@ async def get_credential_issuers(
     """
     Endpoint to get credential issuers for the requested net.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     result = (
@@ -83,6 +93,11 @@ async def get_identity_providers(
     """
     Endpoint to get identity providers for the requested net.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     identity_providers = {}
     try:
@@ -121,6 +136,11 @@ async def get_labeled_accounts(
     """
     Endpoint to get community labeled accounts.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     # labeled accounts only exist for mainnet
     # db_to_use = mongomotor.mainnet
@@ -171,6 +191,11 @@ async def get_community_labeled_accounts(
     """
     Endpoint to get community labeled accounts (indexes).
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     # labeled accounts only exist for mainnet
     db_to_use = mongomotor.mainnet
@@ -290,6 +315,11 @@ async def get_tx_data_for_project(
     """
     Endpoint to get transactions counts for projects (and the chain).
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     dates_to_include = generate_dates_from_start_until_end(start_date, end_date)
     pipeline = [
@@ -322,6 +352,11 @@ async def get_data_for_chain_analysis(
     """
     Endpoint to get data for analysis.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     dates_to_include = generate_dates_from_start_until_end(start_date, end_date)
     pipeline = [
@@ -355,6 +390,11 @@ async def get_data_for_analysis(
     """
     Endpoint to get data for analysis.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     dates_to_include = generate_dates_from_start_until_end(start_date, end_date)
     pipeline = [
@@ -384,6 +424,12 @@ async def get_nodes_count(
     """
     Endpoint to get count of all validator nodes.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.mainnet
     result = await db_to_use[Collections.paydays_current_payday].count_documents({})
     if result:
@@ -409,6 +455,12 @@ async def get_node_info(
     """
     Endpoint to get node information for a given node id.
     """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.mainnet
     result = await db_to_use[Collections.dashboard_nodes].find_one({"_id": node_id})
     if result:
@@ -430,6 +482,11 @@ async def get_all_project_ids(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     project_ids = {}
     result = (
@@ -454,6 +511,11 @@ async def get_project_id(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
 
     result = await mongomotor.utilities[CollectionsUtilities.projects].find_one(
         {"project_id": project_id}
@@ -473,6 +535,12 @@ async def get_project_addresses(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     project_addresses = (
         await db_to_use[Collections.projects]
