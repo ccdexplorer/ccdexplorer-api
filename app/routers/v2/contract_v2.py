@@ -249,7 +249,7 @@ async def get_instance_information(
             status_code=404,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
-
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     instance_info_grpc = grpcclient.get_instance_info(
         contract_index,
         contract_subindex,
@@ -265,11 +265,18 @@ async def get_instance_information(
         }
     )
     if result["v0"]["source_module"] == "":
+        source_module = result["v1"]["source_module"]
         del result["v0"]
     if result["v1"]["source_module"] == "":
+        source_module = result["v0"]["source_module"]
         del result["v1"]
-    # result = await db_to_use[Collections.instances].find_one({"_id": instance_address})
+
     if result:
+        module_result = await db_to_use[Collections.modules].find_one(
+            {"_id": source_module}
+        )
+        if module_result:
+            result["module_verified"] = module_result["verification"]["verified"]
         return result
     else:
         raise HTTPException(

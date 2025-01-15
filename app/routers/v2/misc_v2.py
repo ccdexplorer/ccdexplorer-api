@@ -17,6 +17,119 @@ router = APIRouter(tags=["Misc"], prefix="/v2")
 
 
 @router.get(
+    "/{net}/misc/tx-data/{project_id}/{start_date}/{end_date}",
+    response_class=JSONResponse,
+)
+async def get_tx_data_for_project(
+    request: Request,
+    net: str,
+    project_id: str,
+    start_date: str,
+    end_date: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+    """
+    Endpoint to get transactions counts for projects (and the chain).
+    """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    dates_to_include = generate_dates_from_start_until_end(start_date, end_date)
+    pipeline = [
+        {"$match": {"date": {"$in": dates_to_include}}},
+        {"$match": {"type": "statistics_transaction_types"}},
+        {"$match": {"project": project_id}},
+        {"$project": {"_id": 0, "type": 0, "usecase": 0}},
+        {"$sort": {"date": 1}},
+    ]
+    result = (
+        await mongomotor.mainnet[Collections.statistics]
+        .aggregate(pipeline)
+        .to_list(length=None)
+    )
+    return JSONResponse([x for x in result])
+
+
+@router.get(
+    "/{net}/misc/today-in/{date}",
+    response_class=JSONResponse,
+)
+async def get_today_in_data(
+    request: Request,
+    net: str,
+    date: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+    """
+    Endpoint to get all interesting facts for this day.
+    """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+
+    # logged events by contract
+    pipeline = [
+        {"$match": {"tx_info.date": date}},
+        {"$group": {"_id": "$event_info.contract", "count": {"$count": {}}}},
+        {"$sort": {"count": -1}},
+    ]
+    result = (
+        await db_to_use[Collections.tokens_logged_events_v2]
+        .aggregate(pipeline)
+        .to_list(length=None)
+    )
+    return_result = {"date": date, "logged_events_by_contract": result}
+
+    # tx types
+    pipeline = [
+        {"$match": {"date": date}},
+        {"$match": {"type": "statistics_transaction_types"}},
+        {"$match": {"project": "all"}},
+        {"$project": {"_id": 0, "type": 0, "usecase": 0}},
+        {"$sort": {"date": 1}},
+    ]
+    result = (
+        await mongomotor.mainnet[Collections.statistics]
+        .aggregate(pipeline)
+        .to_list(length=None)
+    )
+    if len(result) > 0:
+        if "tx_type_counts" in result[0]:
+            result = result[0]["tx_type_counts"]
+        else:
+            result = {}
+    else:
+        result = {}
+    return_result["tx_types"] = result
+
+    # impacted addresses
+    pipeline = [
+        {"$match": {"date": date}},
+        {  # this filters out account rewards, as they are special events
+            "$match": {"tx_hash": {"$exists": True}},
+        },
+        {"$group": {"_id": "$impacted_address_canonical", "count": {"$count": {}}}},
+        {"$sort": {"count": -1}},
+    ]
+    result = (
+        await db_to_use[Collections.impacted_addresses]
+        .aggregate(pipeline)
+        .to_list(length=None)
+    )
+    return_result["impacted_addresses"] = result
+    return return_result
+
+
+@router.get(
     "/{net}/misc/cns-domain/{tokenID}",
     response_class=JSONResponse,
 )
