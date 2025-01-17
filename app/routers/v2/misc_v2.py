@@ -76,6 +76,39 @@ async def get_today_in_data(
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
 
+    return_result = {"date": date}
+
+    # day data
+    result = await db_to_use[Collections.blocks_per_day].find_one({"date": date})
+    if result:
+        return_result["day_data"] = result
+
+        pipeline = [
+            {"$match": {"account_transaction": {"$exists": True}}},
+            {
+                "$match": {
+                    "block_info.height": {
+                        "$gte": result["height_for_first_block"],
+                        "$lte": result["height_for_last_block"],
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": None,
+                    "tx_count": {"$count": {}},
+                    "fee_for_day": {"$sum": "$account_transaction.cost"},
+                }
+            },
+        ]
+        result = (
+            await db_to_use[Collections.transactions]
+            .aggregate(pipeline)
+            .to_list(length=None)
+        )
+        return_result["tx_count"] = result[0]["tx_count"]
+        return_result["fee_for_day"] = result[0]["fee_for_day"]
+
     # logged events by contract
     pipeline = [
         {"$match": {"tx_info.date": date}},
@@ -87,7 +120,7 @@ async def get_today_in_data(
         .aggregate(pipeline)
         .to_list(length=None)
     )
-    return_result = {"date": date, "logged_events_by_contract": result}
+    return_result["logged_events_by_contract"] = result
 
     # tx types
     pipeline = [

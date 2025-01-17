@@ -370,13 +370,12 @@ async def get_block_special_events(
 
     special_events = grpcclient.get_block_special_events(height, net=NET(net))
 
-    if special_events:
-        return special_events
-    else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve special events for block at {height} on {net}",
-        )
+    return special_events
+    # else:
+    #     raise HTTPException(
+    #         status_code=404,
+    #         detail=f"Can't retrieve special events for block at {height} on {net}",
+    #     )
 
 
 @router.get("/{net}/block/{height}/chain-parameters", response_class=JSONResponse)

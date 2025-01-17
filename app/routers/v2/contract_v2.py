@@ -276,7 +276,8 @@ async def get_instance_information(
             {"_id": source_module}
         )
         if module_result:
-            result["module_verified"] = module_result["verification"]["verified"]
+            if module_result.get("verification"):
+                result["module_verified"] = module_result["verification"]["verified"]
         return result
     else:
         raise HTTPException(
