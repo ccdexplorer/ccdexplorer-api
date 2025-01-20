@@ -6,7 +6,7 @@ from ccdexplorer_fundamentals.mongodb import (
     MongoDB,
     Collections,
 )
-from ccdexplorer_fundamentals.cis import MongoTypeLoggedEvent
+from ccdexplorer_fundamentals.cis import MongoTypeLoggedEventV2
 from ccdexplorer_fundamentals.GRPCClient.CCD_Types import CCD_BlockItemSummary
 from app.state_getters import get_mongo_db
 
@@ -21,9 +21,9 @@ async def get_transaction_logged_events(
     tx_hash: str,
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
-) -> list[MongoTypeLoggedEvent]:
+) -> dict:
     """
-    Get logged events for a transaction from the MongoDB `tokens_logged_events` collection.
+    Get logged events for a transaction from the MongoDB `tokens_logged_events_v2` collection.
 
     Parameters:
     - net (str): Network type, either "testnet" or "mainnet".
@@ -31,7 +31,7 @@ async def get_transaction_logged_events(
     - mongodb (MongoDB, optional): MongoDB dependency, defaults to `get_mongo_db`.
 
     Returns:
-    - list[MongoTypeLoggedEvent]: A list of logged events for the specified transaction.
+    - list[MongoTypeLoggedEventV2]: A list of logged events for the specified transaction.
 
     Raises:
     - HTTPException: If the transaction hash is not found in the specified network.
@@ -45,17 +45,24 @@ async def get_transaction_logged_events(
 
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     pipeline = [
-        {"$match": {"tx_hash": tx_hash}},
-        {
-            "$sort": {
-                "ordering": ASCENDING,
-            }
-        },
+        {"$match": {"tx_info.tx_hash": tx_hash}},
+        # {
+        #     "$sort": {
+        #         "ordering": ASCENDING,
+        #     }
+        # },
     ]
-    result = list(db_to_use[Collections.tokens_logged_events].aggregate(pipeline))
+    result = list(db_to_use[Collections.tokens_logged_events_v2].aggregate(pipeline))
 
     if len(result) > 0:
-        result = [MongoTypeLoggedEvent(**x) for x in result]
+        result = {
+            (
+                x["event_info"]["effect_index"],
+                x["event_info"]["event_index"],
+            ): MongoTypeLoggedEventV2(**x)
+            for x in result
+        }
+        # result = [MongoTypeLoggedEventV2(**x) for x in result]
 
         return result
     else:
