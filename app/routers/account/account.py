@@ -118,7 +118,7 @@ async def account_home(
     # read user again back from updated db
     user: User = get_user_details(request)
 
-    total_paid_amount = [payment.amount_euroe for payment in user.payments.values()]
+    # total_paid_amount = [payment.amount_euroe for payment in user.payments.values()]
 
     user_api_keys = await get_user_api_keys(user, request.app.motormongo)
     if len(user_api_keys) == 0:
@@ -185,7 +185,7 @@ async def account_home(
         "user": user,
         "user_api_keys": user_api_keys,
         "sample_key": sample_key,
-        "total_paid_amount": total_paid_amount,
+        # "total_paid_amount": total_paid_amount,
         "day_calls_remaining": day_calls_remaining,
         "min_calls_remaining": min_calls_remaining,
         "ttl_date": ttl_date,
