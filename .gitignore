@@ -1,0 +1,56 @@
+/.venv
+.env
+!/node_modules
+/node_modules/*
+!/node_modules/bootstrap-icons
+/node_modules/bootstrap-icons/*
+!/node_modules/bootstrap-icons/font
+# to include the actual font files
+/node_modules/bootstrap-icons/font/*
+!/node_modules/bootstrap-icons/font/bootstrap-icons.min.css
+!/node_modules/bootstrap-icons/font/fonts
+
+!/node_modules/bootstrap/
+/node_modules/bootstrap/*
+!/node_modules/bootstrap/dist
+/node_modules/bootstrap/dist/*
+!/node_modules/bootstrap/dist/js
+/node_modules/bootstrap/dist/js/*
+!/node_modules/bootstrap/dist/js/bootstrap.bundle.min.js
+
+!/node_modules/plotly.js-dist
+/node_modules/plotly.js-dist/*
+!/node_modules/plotly.js-dist/plotly.js
+
+!/node_modules/htmx.org/
+/node_modules/htmx.org/*
+!/node_modules/htmx.org/dist/
+/node_modules/htmx.org/dist/*
+!/node_modules/htmx.org/dist/htmx.js
+
+!/custom_scss
+!/custom_scss/*
+!/custom_scss/custom_scss
+
+!requirements.txt
+!Dockerfile
+
+
+
+
+.DS_Store
+!/app/*
+
+
+# !/app
+# /app/static
+# !/app/static/*
+# /app/static/js
+# !/app/static/js/*
+
+
+
+*.pyc
+
+.vscode/launch.json
+.vscode/settings.json
