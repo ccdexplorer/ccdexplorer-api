@@ -542,7 +542,14 @@ async def get_data_for_analysis(
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
-    dates_to_include = generate_dates_from_start_until_end(start_date, end_date)
+    try:
+        dates_to_include = generate_dates_from_start_until_end(start_date, end_date)
+    except:  # noqa: E722
+        raise HTTPException(
+            status_code=404,
+            detail="No valid date(s) given.",
+        )
+
     pipeline = [
         {"$match": {"date": {"$in": dates_to_include}}},
         {"$match": {"type": analysis}},
