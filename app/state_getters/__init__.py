@@ -81,10 +81,10 @@ async def get_api_keys(
     now = dt.datetime.now().astimezone(dt.timezone.utc)
 
     if ((now - app.api_keys_last_requested).total_seconds() < 5) and (app.api_keys):
-        print(f"keys for {for_} from app_cache")
+        # print(f"keys for {for_} from app_cache")
         return app.api_keys
 
-    print(f"keys for {for_} from collection")
+    # print(f"keys for {for_} from collection")
     now = dt.datetime.now().astimezone(dt.UTC)
     pipeline = [
         {"$match": {"scope": API_URL}},
@@ -120,7 +120,7 @@ def save_api_keys_for_topic(
     req: Request = None, mongodb=None, app=None, for_: str = None
 ):
 
-    print(f"keys for {for_} from collection")
+    # print(f"keys for {for_} from collection")
     now = dt.datetime.now().astimezone(dt.UTC)
     pipeline = [
         {"$match": {"scope": API_URL}},
